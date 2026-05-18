@@ -3,7 +3,8 @@ import json
 import logging
 import os
 import unicodedata
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Any, Optional
 
 import httpx
 
@@ -84,26 +85,104 @@ def _extract_post_id(item: dict) -> Optional[str]:
     return None
 
 
+def _epoch_to_iso(v: float) -> Optional[str]:
+    ts = v if v < 10**11 else v / 1000
+    try:
+        return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+    except (OSError, ValueError, OverflowError):
+        return None
+
+
+def _to_iso(v: Any) -> Optional[str]:
+    """Coerce Apify date values (str / number / nested dict) to an ISO string."""
+    if v is None:
+        return None
+    if isinstance(v, str):
+        return v
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return _epoch_to_iso(v)
+    if isinstance(v, dict):
+        for nk in ("iso", "isoString", "isoDate", "datetime", "date", "value"):
+            s = _to_iso(v.get(nk))
+            if s:
+                return s
+        ts = v.get("timestamp") or v.get("ts") or v.get("epoch")
+        if isinstance(ts, (int, float)):
+            return _epoch_to_iso(ts)
+    return None
+
+
+def _to_int(v: Any) -> Optional[int]:
+    if isinstance(v, bool):
+        return int(v)
+    if isinstance(v, int):
+        return v
+    if isinstance(v, float):
+        return int(v)
+    if isinstance(v, str):
+        try:
+            return int(v)
+        except ValueError:
+            return None
+    if isinstance(v, dict):
+        for k in ("count", "total", "value", "n"):
+            n = _to_int(v.get(k))
+            if n is not None:
+                return n
+    return None
+
+
+def _to_text(v: Any) -> Optional[str]:
+    if v is None or isinstance(v, str):
+        return v
+    if isinstance(v, (int, float, bool)):
+        return str(v)
+    return json.dumps(v, ensure_ascii=False)
+
+
+def _extract_posted_at(item: dict) -> Optional[str]:
+    for key in ("postedAtIso", "publishedAt", "postedAt", "posted_at", "createdAt"):
+        s = _to_iso(item.get(key))
+        if s:
+            return s
+    return None
+
+
+def _extract_url(item: dict) -> Optional[str]:
+    for key in ("url", "postUrl", "linkedinUrl", "permalink"):
+        v = item.get(key)
+        if isinstance(v, str) and v:
+            return v
+    return None
+
+
 async def _insert_post_if_new(handle_id: int, post_id: str, item: dict) -> Optional[int]:
     """Returns the new posts.id if inserted, None if duplicate."""
     async with get_db() as db:
         cur = await db.execute("SELECT 1 FROM posts WHERE post_id = ?", (post_id,))
         if await cur.fetchone():
             return None
-        content = _normalize_content(item.get("content") or item.get("text"))
-        url = item.get("url") or item.get("postUrl")
-        posted_at = (
-            item.get("postedAt")
-            or item.get("postedAtIso")
-            or item.get("publishedAt")
+        content = _normalize_content(
+            _to_text(item.get("content")) or _to_text(item.get("text"))
         )
+        url = _extract_url(item)
+        posted_at = _extract_posted_at(item)
         engagement_json = json.dumps(
             {
-                "reactions": item.get("reactionsCount") or item.get("likes"),
-                "comments": item.get("commentsCount") or item.get("comments"),
-                "reposts": item.get("repostsCount") or item.get("reposts"),
+                "reactions": _to_int(item.get("reactionsCount"))
+                or _to_int(item.get("likes"))
+                or _to_int(item.get("numLikes")),
+                "comments": _to_int(item.get("commentsCount"))
+                or _to_int(item.get("comments"))
+                or _to_int(item.get("numComments")),
+                "reposts": _to_int(item.get("repostsCount"))
+                or _to_int(item.get("reposts"))
+                or _to_int(item.get("numReposts")),
                 "raw": item,
-            }
+            },
+            default=str,
         )
         cur = await db.execute(
             "INSERT INTO posts (handle_id, post_id, content, url, engagement_json, posted_at) "

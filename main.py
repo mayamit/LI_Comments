@@ -23,6 +23,8 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+# httpx logs full request URLs at INFO, which leaks the APIFY_TOKEN query param.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 REQUIRED_ENV = ["APIFY_TOKEN"]
 
