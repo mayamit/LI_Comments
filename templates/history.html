@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}History · LI_Comments{% endblock %}
+{% block content %}
+<div id="history-main">
+
+<section class="stats">
+    <h2>Stats</h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.posts_reviewed }}</div>
+            <div class="stat-label">posts reviewed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.comments_posted }}</div>
+            <div class="stat-label">comments posted</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">
+                {% if stats.most_used_tone %}{{ stats.most_used_tone.name }}{% else %}—{% endif %}
+            </div>
+            <div class="stat-label">
+                most used tone
+                {% if stats.most_used_tone %}<span class="muted">({{ stats.most_used_tone.count }}×)</span>{% endif %}
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.this_week }} <span class="muted">vs {{ stats.last_week }}</span></div>
+            <div class="stat-label">this week vs last week</div>
+        </div>
+    </div>
+
+    {% if stats.per_handle %}
+    <div class="per-handle">
+        <strong>By handle:</strong>
+        {% for h in stats.per_handle %}
+        <span class="handle-pill">@{{ h.linkedin_handle }} <span class="muted">{{ h.c }}</span></span>
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>
+
+<section class="history-filters">
+    <h2>History ({{ rows|length }})</h2>
+    <form method="get" action="/history" class="filter-form">
+        <label>Handle
+            <select name="handle">
+                <option value="">All handles</option>
+                {% for h in handle_options %}
+                <option value="{{ h.linkedin_handle }}" {% if filter_handle == h.linkedin_handle %}selected{% endif %}>
+                    @{{ h.linkedin_handle }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>From
+            <input type="date" name="date_from" value="{{ filter_from }}">
+        </label>
+        <label>To
+            <input type="date" name="date_to" value="{{ filter_to }}">
+        </label>
+        <button type="submit">Apply</button>
+        <a href="/history" class="btn-link-text">Clear</a>
+    </form>
+</section>
+
+{% if not rows %}
+<div class="empty-feed">
+    <p>No comments marked posted yet.
+    {% if filter_handle or filter_from or filter_to %}
+    Try clearing the filters.
+    {% else %}
+    Once you mark a comment as posted from the dashboard, it will appear here.
+    {% endif %}
+    </p>
+</div>
+{% else %}
+<div class="history-list">
+    {% for r in rows %}
+    <details class="history-row">
+        <summary>
+            <span class="history-date">{{ r.posted_at }}</span>
+            <span class="muted">({{ r.posted_at_display }})</span>
+            <span class="history-handle">@{{ r.handle }}</span>
+            {% if r.handle_deleted %}<em class="muted">(deleted)</em>{% endif %}
+            <span class="tone-pill">{{ r.tone_name }}</span>
+            <span class="history-preview">{{ r.post_preview }}</span>
+        </summary>
+        <div class="history-detail">
+            <div class="detail-block">
+                <h4>Original post</h4>
+                <p class="post-preview">{{ r.post_content }}</p>
+                {% if r.post_url %}
+                <a href="{{ r.post_url }}" target="_blank" rel="noopener" class="btn-link">Open on LinkedIn ↗</a>
+                {% endif %}
+            </div>
+            <div class="detail-block">
+                <h4>Comment you posted</h4>
+                <p class="comment-text">{{ r.comment_content or '(comment no longer in database)' }}</p>
+            </div>
+        </div>
+    </details>
+    {% endfor %}
+</div>
+{% endif %}
+
+</div>
+{% endblock %}

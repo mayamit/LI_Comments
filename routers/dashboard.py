@@ -50,6 +50,20 @@ async def _fetch_status_counts() -> dict:
     return counts
 
 
+async def _fetch_posted_tones(post_ids: list[int]) -> dict[int, str]:
+    """Latest posted tone per post_id (one row per post by design)."""
+    if not post_ids:
+        return {}
+    qmarks = ",".join("?" for _ in post_ids)
+    async with get_db() as db:
+        cur = await db.execute(
+            f"SELECT post_id, tone FROM posted_log WHERE post_id IN ({qmarks})",
+            post_ids,
+        )
+        rows = await cur.fetchall()
+    return {r["post_id"]: r["tone"] for r in rows}
+
+
 async def _fetch_posts(status: str) -> list[dict]:
     if status == "all":
         where, params = "", ()
@@ -89,12 +103,14 @@ async def _fetch_posts(status: str) -> list[dict]:
             "edited": bool(c["edited"]),
         }
 
+    posted_tones = await _fetch_posted_tones(post_ids)
     tones = tones_store.get_all()
 
     posts = []
     for r in post_rows:
         engagement = _parse_engagement(r["engagement_json"])
         time_iso = r["posted_at"] or r["fetched_at"]
+        posted_tone = posted_tones.get(r["id"])
         # Render the 6 tones in canonical order; mark missing ones explicitly.
         tone_blocks = []
         for t in tones:
@@ -105,6 +121,7 @@ async def _fetch_posts(status: str) -> list[dict]:
                     "name": t["name"],
                     "description": t.get("description") or "",
                     "comment": c,
+                    "is_posted": (t["key"] == posted_tone),
                 }
             )
         posts.append(
@@ -123,6 +140,7 @@ async def _fetch_posts(status: str) -> list[dict]:
                 "tone_blocks": tone_blocks,
                 "comment_count": sum(1 for b in tone_blocks if b["comment"]),
                 "can_regenerate": r["status"] != "posted",
+                "is_posted_status": r["status"] == "posted",
             }
         )
     return posts
@@ -135,6 +153,7 @@ async def _render_dashboard(
     status: str = "unreviewed",
     flash: Optional[str] = None,
     error: Optional[str] = None,
+    undo_log_id: Optional[int] = None,
 ):
     if status not in {"all", *VALID_STATUSES}:
         status = "unreviewed"
@@ -147,6 +166,7 @@ async def _render_dashboard(
         "status_tabs": STATUS_TABS,
         "flash": flash,
         "error": error,
+        "undo_log_id": undo_log_id,
     }
     template = "dashboard.html" if full_page else "_dashboard_main.html"
     return templates.TemplateResponse(request, template, ctx)
@@ -302,6 +322,71 @@ async def comment_save(
     s = await _post_status(post_id)
     return await _render_comment_block(
         request, post_id, tone_key, editing=False, can_regenerate=(s != "posted")
+    )
+
+
+@router.post("/posts/{post_id}/comments/{tone_key}/mark-posted", response_class=HTMLResponse)
+async def mark_posted(
+    request: Request, post_id: int, tone_key: str, status: str = Form("unreviewed")
+):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT id, content FROM generated_comments WHERE post_id = ? AND tone = ?",
+            (post_id, tone_key),
+        )
+        comment = await cur.fetchone()
+        if not comment:
+            return await _render_dashboard(
+                request, full_page=False, status=status,
+                error=f"No comment found for tone '{tone_key}' on this post.",
+            )
+        # One posted-log row per post; replace any prior selection.
+        await db.execute("DELETE FROM posted_log WHERE post_id = ?", (post_id,))
+        cur = await db.execute(
+            "INSERT INTO posted_log (post_id, comment_id, tone) VALUES (?, ?, ?)",
+            (post_id, comment["id"], tone_key),
+        )
+        log_id = cur.lastrowid
+        await db.execute("UPDATE posts SET status = 'posted' WHERE id = ?", (post_id,))
+        await db.commit()
+    return await _render_dashboard(
+        request, full_page=False, status=status, undo_log_id=log_id,
+    )
+
+
+@router.post("/posted/{log_id}/undo", response_class=HTMLResponse)
+async def undo_mark_posted(request: Request, log_id: int, status: str = Form("unreviewed")):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT post_id, posted_at FROM posted_log WHERE id = ?", (log_id,)
+        )
+        row = await cur.fetchone()
+    if not row:
+        return await _render_dashboard(
+            request, full_page=False, status=status,
+            error="Already undone or expired.",
+        )
+    from datetime import datetime, timezone
+    try:
+        posted_at = datetime.fromisoformat(row["posted_at"].replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        posted_at = datetime.now(timezone.utc)
+    if posted_at.tzinfo is None:
+        posted_at = posted_at.replace(tzinfo=timezone.utc)
+    age_s = (datetime.now(timezone.utc) - posted_at).total_seconds()
+    if age_s > 10:
+        return await _render_dashboard(
+            request, full_page=False, status=status,
+            error="Undo window expired (10 seconds).",
+        )
+    async with get_db() as db:
+        await db.execute("DELETE FROM posted_log WHERE id = ?", (log_id,))
+        await db.execute(
+            "UPDATE posts SET status = 'reviewed' WHERE id = ?", (row["post_id"],)
+        )
+        await db.commit()
+    return await _render_dashboard(
+        request, full_page=False, status=status, flash="Undone."
     )
 
 

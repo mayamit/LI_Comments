@@ -2,6 +2,33 @@
     {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
     {% if flash %}<div class="alert alert-success">{{ flash }}</div>{% endif %}
 
+    {% if undo_log_id %}
+    <div class="undo-banner" id="undo-banner-{{ undo_log_id }}">
+        Posted ✓
+        <button hx-post="/dashboard/posted/{{ undo_log_id }}/undo"
+                hx-target="#dashboard-main" hx-swap="outerHTML"
+                hx-vals='{"status": "{{ active_status }}"}'
+                class="btn-small">Undo</button>
+        <span id="undo-timer-{{ undo_log_id }}">10s</span>
+        <script>
+        (function() {
+            const banner = document.getElementById("undo-banner-{{ undo_log_id }}");
+            const timer = document.getElementById("undo-timer-{{ undo_log_id }}");
+            let remaining = 10;
+            const intv = setInterval(() => {
+                remaining -= 1;
+                if (remaining <= 0) {
+                    if (banner) banner.style.display = "none";
+                    clearInterval(intv);
+                } else if (timer) {
+                    timer.textContent = remaining + "s";
+                }
+            }, 1000);
+        })();
+        </script>
+    </div>
+    {% endif %}
+
     <section class="filter-tabs">
         {% for key, label in status_tabs %}
         <button hx-get="/dashboard?status={{ key }}"
