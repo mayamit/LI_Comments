@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from agent import run_fetch
 from database import init_db
 from routers import admin
+from routers import dashboard
 from routers import tones as tones_router
 
 load_dotenv()
@@ -75,11 +76,12 @@ app = FastAPI(title="LI_Comments", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(admin.router)
 app.include_router(tones_router.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/")
 async def index():
-    return RedirectResponse(url="/admin")
+    return RedirectResponse(url="/dashboard")
 
 
 @app.get("/health")

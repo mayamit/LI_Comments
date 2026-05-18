@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 
 from agent import get_last_run, run_fetch
 from database import get_db
+from utils import relative_time as _relative_time
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 templates = Jinja2Templates(directory="templates")
@@ -15,26 +16,15 @@ templates = Jinja2Templates(directory="templates")
 HANDLE_RE = re.compile(r"^[a-zA-Z0-9-]{1,100}$")
 
 
-def _relative_time(iso: Optional[str]) -> str:
-    if not iso:
-        return "Never"
-    dt = datetime.fromisoformat(iso).replace(tzinfo=timezone.utc)
-    secs = int((datetime.now(timezone.utc) - dt).total_seconds())
-    if secs < 60:
-        return f"{max(secs, 0)}s ago"
-    minutes = secs // 60
-    if minutes < 60:
-        return f"{minutes}m ago"
-    hours = minutes // 60
-    if hours < 24:
-        return f"{hours}h ago"
-    return f"{hours // 24}d ago"
-
-
 def _is_stale(iso: Optional[str]) -> bool:
     if not iso:
         return True
-    dt = datetime.fromisoformat(iso).replace(tzinfo=timezone.utc)
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
     return (datetime.now(timezone.utc) - dt).total_seconds() > 86_400
 
 

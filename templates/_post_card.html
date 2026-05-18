@@ -1,0 +1,85 @@
+{# Vars: p (post), active_status #}
+<article class="post-card status-{{ p.status }}" id="post-{{ p.id }}">
+    <header class="post-header">
+        <div class="post-author">
+            <strong>{{ p.display_name }}</strong>
+            <span class="muted">@{{ p.handle }}{% if p.handle_deleted %} <em>(deleted)</em>{% endif %}</span>
+            <span class="muted">· {{ p.time_display }}</span>
+            {% if p.status != "unreviewed" %}
+            <span class="status-badge status-{{ p.status }}">{{ p.status }}</span>
+            {% endif %}
+        </div>
+        <div class="post-actions">
+            {% if p.url %}
+            <a href="{{ p.url }}" target="_blank" rel="noopener" class="btn-link open-link">Open on LinkedIn ↗</a>
+            {% endif %}
+            {% if p.can_regenerate %}
+            <button hx-post="/dashboard/posts/{{ p.id }}/regenerate"
+                    hx-target="#dashboard-main" hx-swap="outerHTML"
+                    hx-vals='{"status": "{{ active_status }}"}'
+                    hx-confirm="Regenerate all 6 tones for this post?"
+                    hx-indicator="#regen-{{ p.id }}"
+                    class="btn-secondary regen">Regenerate all</button>
+            <span id="regen-{{ p.id }}" class="htmx-indicator inline-spinner">working…</span>
+            {% endif %}
+            {% if p.status != "dismissed" %}
+            <button hx-post="/dashboard/posts/{{ p.id }}/dismiss"
+                    hx-target="#dashboard-main" hx-swap="outerHTML"
+                    hx-vals='{"status": "{{ active_status }}"}'
+                    hx-confirm="Dismiss this post?"
+                    class="btn-danger dismiss">Dismiss</button>
+            {% endif %}
+        </div>
+    </header>
+
+    <div class="post-engagement">
+        {% set e = p.engagement %}
+        {% if e.reactions is not none %}<span>♥ {{ e.reactions }}</span>{% endif %}
+        {% if e.comments is not none %}<span>💬 {{ e.comments }}</span>{% endif %}
+        {% if e.reposts is not none %}<span>↻ {{ e.reposts }}</span>{% endif %}
+    </div>
+
+    <div class="post-preview">{{ p.preview }}</div>
+
+    {% if p.comment_count == 0 %}
+    <div class="no-comments">No comments generated yet for this post.</div>
+    {% endif %}
+
+    <div class="tone-blocks">
+        {% for tb in p.tone_blocks %}
+        <div class="comment-block" id="comment-{{ p.id }}-{{ tb.key }}">
+            <div class="tone-label">
+                <strong>{{ tb.name }}</strong>
+                {% if tb.description %}<span class="muted">— {{ tb.description }}</span>{% endif %}
+            </div>
+            {% if tb.comment %}
+            <div class="comment-text">{{ tb.comment.content }}</div>
+            <div class="comment-meta">
+                {% if tb.comment.edited %}<span class="edited-badge">Edited</span>{% endif %}
+                <button hx-get="/dashboard/posts/{{ p.id }}/comments/{{ tb.key }}/edit"
+                        hx-target="#comment-{{ p.id }}-{{ tb.key }}" hx-swap="outerHTML"
+                        class="btn-small edit">Edit</button>
+                <button onclick="liCopy(this, this.closest('.comment-block').querySelector('.comment-text'), {{ p.id }})"
+                        class="btn-small copy">Copy</button>
+                {% if p.can_regenerate %}
+                <button hx-post="/dashboard/posts/{{ p.id }}/comments/{{ tb.key }}/regenerate"
+                        hx-target="#comment-{{ p.id }}-{{ tb.key }}" hx-swap="outerHTML"
+                        hx-indicator="#regen-{{ p.id }}-{{ tb.key }}"
+                        class="btn-small regen-one">Regenerate this</button>
+                <span id="regen-{{ p.id }}-{{ tb.key }}" class="htmx-indicator inline-spinner">…</span>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="comment-missing">
+                <em>No comment for this tone.</em>
+                {% if p.can_regenerate %}
+                <button hx-post="/dashboard/posts/{{ p.id }}/comments/{{ tb.key }}/regenerate"
+                        hx-target="#comment-{{ p.id }}-{{ tb.key }}" hx-swap="outerHTML"
+                        class="btn-small regen-one">Generate this tone</button>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</article>

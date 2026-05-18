@@ -110,6 +110,50 @@ async def _generate_one_safe(
         return (tone, None, e)
 
 
+async def regenerate_one_tone(post_id: int, tone_key: str) -> Optional[str]:
+    """Regenerate a single tone for a post. Replaces the existing row.
+
+    Returns the new content, or None if the model returned SKIP/empty.
+    Raises on subprocess / API failure.
+    """
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT p.id, p.content, h.linkedin_handle, h.display_name "
+            "FROM posts p JOIN handles h ON p.handle_id = h.id "
+            "WHERE p.id = ?",
+            (post_id,),
+        )
+        post = await cur.fetchone()
+    if not post:
+        raise ValueError(f"Post {post_id} not found")
+
+    data = tones_store.load()
+    tone = next((t for t in data["tones"] if t["key"] == tone_key), None)
+    if not tone:
+        raise ValueError(f"Tone '{tone_key}' not found")
+
+    content = await _generate_one(
+        data["shared_system_prompt"],
+        tone,
+        post["display_name"],
+        post["linkedin_handle"],
+        post["content"],
+    )
+
+    async with get_db() as db:
+        await db.execute(
+            "DELETE FROM generated_comments WHERE post_id = ? AND tone = ?",
+            (post_id, tone_key),
+        )
+        if content is not None:
+            await db.execute(
+                "INSERT INTO generated_comments (post_id, tone, content) VALUES (?, ?, ?)",
+                (post_id, tone_key, content),
+            )
+        await db.commit()
+    return content
+
+
 async def generate_for_post(post_id: int) -> dict:
     """Generate one comment per tone for a post, in parallel.
 

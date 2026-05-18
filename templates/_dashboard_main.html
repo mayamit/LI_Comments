@@ -1,0 +1,32 @@
+<div id="dashboard-main">
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+    {% if flash %}<div class="alert alert-success">{{ flash }}</div>{% endif %}
+
+    <section class="filter-tabs">
+        {% for key, label in status_tabs %}
+        <button hx-get="/dashboard?status={{ key }}"
+                hx-target="#dashboard-main"
+                hx-swap="outerHTML"
+                hx-push-url="true"
+                class="tab {% if active_status == key %}active{% endif %}">
+            {{ label }} <span class="count">{{ counts[key] }}</span>
+        </button>
+        {% endfor %}
+    </section>
+
+    {% if not posts %}
+    <div class="empty-feed">
+        {% if active_status == "unreviewed" %}
+        <p>Nothing to review. Either no new posts have been fetched, or you've cleared the queue. Try <a href="/admin">Run Now</a> on the Handles page.</p>
+        {% else %}
+        <p>No posts in <strong>{{ active_status }}</strong>.</p>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="posts-feed">
+        {% for p in posts %}
+        {% include "_post_card.html" %}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>

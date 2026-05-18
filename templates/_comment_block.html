@@ -1,0 +1,46 @@
+<div class="comment-block" id="comment-{{ post_id }}-{{ tone.key }}">
+    <div class="tone-label">
+        <strong>{{ tone.name }}</strong>
+        {% if tone.description %}<span class="muted">— {{ tone.description }}</span>{% endif %}
+    </div>
+    {% if regenerate_error %}<div class="alert alert-error compact">{{ regenerate_error }}</div>{% endif %}
+
+    {% if editing and comment %}
+    <form hx-post="/dashboard/posts/{{ post_id }}/comments/{{ tone.key }}"
+          hx-target="#comment-{{ post_id }}-{{ tone.key }}" hx-swap="outerHTML"
+          class="comment-edit-form">
+        <textarea name="content" rows="4" required>{{ comment.content }}</textarea>
+        <div class="comment-meta">
+            <button type="submit" class="btn-small">Save</button>
+            <button type="button"
+                    hx-get="/dashboard/posts/{{ post_id }}/comments/{{ tone.key }}"
+                    hx-target="#comment-{{ post_id }}-{{ tone.key }}" hx-swap="outerHTML"
+                    class="btn-small btn-secondary">Cancel</button>
+        </div>
+    </form>
+    {% elif comment %}
+    <div class="comment-text">{{ comment.content }}</div>
+    <div class="comment-meta">
+        {% if comment.edited %}<span class="edited-badge">Edited</span>{% endif %}
+        <button hx-get="/dashboard/posts/{{ post_id }}/comments/{{ tone.key }}/edit"
+                hx-target="#comment-{{ post_id }}-{{ tone.key }}" hx-swap="outerHTML"
+                class="btn-small edit">Edit</button>
+        <button onclick="liCopy(this, this.closest('.comment-block').querySelector('.comment-text'), {{ post_id }})"
+                class="btn-small copy">Copy</button>
+        {% if can_regenerate %}
+        <button hx-post="/dashboard/posts/{{ post_id }}/comments/{{ tone.key }}/regenerate"
+                hx-target="#comment-{{ post_id }}-{{ tone.key }}" hx-swap="outerHTML"
+                class="btn-small regen-one">Regenerate this</button>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="comment-missing">
+        <em>No comment for this tone.</em>
+        {% if can_regenerate %}
+        <button hx-post="/dashboard/posts/{{ post_id }}/comments/{{ tone.key }}/regenerate"
+                hx-target="#comment-{{ post_id }}-{{ tone.key }}" hx-swap="outerHTML"
+                class="btn-small regen-one">Generate this tone</button>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
