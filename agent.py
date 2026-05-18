@@ -84,12 +84,12 @@ def _extract_post_id(item: dict) -> Optional[str]:
     return None
 
 
-async def _insert_post_if_new(handle_id: int, post_id: str, item: dict) -> bool:
-    """Returns True if inserted, False if duplicate."""
+async def _insert_post_if_new(handle_id: int, post_id: str, item: dict) -> Optional[int]:
+    """Returns the new posts.id if inserted, None if duplicate."""
     async with get_db() as db:
         cur = await db.execute("SELECT 1 FROM posts WHERE post_id = ?", (post_id,))
         if await cur.fetchone():
-            return False
+            return None
         content = _normalize_content(item.get("content") or item.get("text"))
         url = item.get("url") or item.get("postUrl")
         posted_at = (
@@ -105,13 +105,13 @@ async def _insert_post_if_new(handle_id: int, post_id: str, item: dict) -> bool:
                 "raw": item,
             }
         )
-        await db.execute(
+        cur = await db.execute(
             "INSERT INTO posts (handle_id, post_id, content, url, engagement_json, posted_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             (handle_id, post_id, content, url, engagement_json, posted_at),
         )
         await db.commit()
-        return True
+        return cur.lastrowid
 
 
 async def _update_last_fetched(handle_id: int) -> None:
@@ -148,6 +148,8 @@ async def run_fetch(trigger: str = "manual") -> dict:
 
 
 async def _run_fetch_inner(trigger: str) -> dict:
+    from comments import generate_for_post  # local import avoids circulars at boot
+
     started_at = await _now_iso()
     summary = {
         "trigger": trigger,
@@ -155,6 +157,7 @@ async def _run_fetch_inner(trigger: str) -> dict:
         "handles_processed": 0,
         "new_posts": 0,
         "skipped_duplicates": 0,
+        "comments_generated": 0,
         "errors": [],
     }
 
@@ -185,8 +188,21 @@ async def _run_fetch_inner(trigger: str) -> dict:
             post_id = _extract_post_id(item)
             if not post_id:
                 raise FetchError("post_id missing from Apify response")
-            if await _insert_post_if_new(h["id"], post_id, item):
+            new_db_id = await _insert_post_if_new(h["id"], post_id, item)
+            if new_db_id is not None:
                 summary["new_posts"] += 1
+                try:
+                    gen = await generate_for_post(new_db_id)
+                    summary["comments_generated"] += gen["generated"]
+                    for err in gen["errors"]:
+                        summary["errors"].append(
+                            {"handle": handle_name, "error": f"comment ({err['tone']}): {err['error']}"}
+                        )
+                except Exception as e:
+                    logger.exception("Comment generation failed for post %d", new_db_id)
+                    summary["errors"].append(
+                        {"handle": handle_name, "error": f"comment generation: {e}"}
+                    )
             else:
                 summary["skipped_duplicates"] += 1
             await _update_last_fetched(h["id"])
@@ -208,18 +224,24 @@ async def _run_fetch_inner(trigger: str) -> dict:
                 summary["new_posts"],
                 summary["skipped_duplicates"],
                 len(summary["errors"]),
-                json.dumps({"errors": summary["errors"]}),
+                json.dumps(
+                    {
+                        "errors": summary["errors"],
+                        "comments_generated": summary["comments_generated"],
+                    }
+                ),
                 run_id,
             ),
         )
         await db.commit()
 
     logger.info(
-        "Fetch run %s done: %d handles, %d new, %d dup, %d errors",
+        "Fetch run %s done: %d handles, %d new, %d dup, %d comments, %d errors",
         trigger,
         summary["handles_processed"],
         summary["new_posts"],
         summary["skipped_duplicates"],
+        summary["comments_generated"],
         len(summary["errors"]),
     )
     return summary
@@ -237,5 +259,7 @@ async def get_last_run() -> Optional[dict]:
         return None
     d = dict(row)
     raw = d.pop("summary_json") or "{}"
-    d["errors"] = json.loads(raw).get("errors", [])
+    parsed = json.loads(raw)
+    d["errors"] = parsed.get("errors", [])
+    d["comments_generated"] = parsed.get("comments_generated", 0)
     return d

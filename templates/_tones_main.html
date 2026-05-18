@@ -1,0 +1,108 @@
+<div id="tones-main">
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+    {% if flash %}<div class="alert alert-success">{{ flash }}</div>{% endif %}
+
+    <section class="tones-list">
+        <div class="section-header">
+            <h2>Tones ({{ tones|length }})</h2>
+            {% if not show_new and not edit_key %}
+            <button hx-get="/admin/tones/new"
+                    hx-target="#tones-main" hx-swap="outerHTML"
+                    class="add-tone">+ Add tone</button>
+            {% endif %}
+        </div>
+
+        {% if show_new %}
+        <div class="tone-edit-card">
+            <h3>New tone</h3>
+            <form hx-post="/admin/tones" hx-target="#tones-main" hx-swap="outerHTML" autocomplete="off">
+                <label>
+                    Key (slug)
+                    <input type="text" name="key" placeholder="e.g. analytical" required pattern="[a-z0-9_]+">
+                    <small>Lowercase letters, numbers, underscores. Immutable after creation.</small>
+                </label>
+                <label>
+                    Name
+                    <input type="text" name="name" placeholder="Display name" required>
+                </label>
+                <label>
+                    Description
+                    <input type="text" name="description" placeholder="One-line summary (optional)">
+                </label>
+                <label>
+                    Tone prompt
+                    <textarea name="tone_prompt" rows="14" required placeholder="Instructions appended to the shared system prompt for this tone…"></textarea>
+                </label>
+                <div class="form-actions">
+                    <button type="submit">Create tone</button>
+                    <a hx-get="/admin/tones" hx-target="#tones-main" hx-swap="outerHTML">Cancel</a>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if not tones %}
+            <p class="empty">No tones defined. Add one above.</p>
+        {% else %}
+            {% for t in tones %}
+                {% if edit_key == t.key %}
+                <div class="tone-edit-card">
+                    <h3>Edit <code>{{ t.key }}</code></h3>
+                    <form hx-post="/admin/tones/{{ t.key }}/edit" hx-target="#tones-main" hx-swap="outerHTML" autocomplete="off">
+                        <label>
+                            Name
+                            <input type="text" name="name" value="{{ t.name }}" required>
+                        </label>
+                        <label>
+                            Description
+                            <input type="text" name="description" value="{{ t.description or '' }}">
+                        </label>
+                        <label>
+                            Tone prompt
+                            <textarea name="tone_prompt" rows="14" required>{{ t.tone_prompt }}</textarea>
+                        </label>
+                        <div class="form-actions">
+                            <button type="submit">Save</button>
+                            <a hx-get="/admin/tones" hx-target="#tones-main" hx-swap="outerHTML">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+                {% else %}
+                <div class="tone-card">
+                    <div class="tone-header">
+                        <div>
+                            <strong>{{ t.name }}</strong>
+                            <code class="tone-key">{{ t.key }}</code>
+                        </div>
+                        <div class="tone-actions">
+                            <button hx-get="/admin/tones/{{ t.key }}/edit"
+                                    hx-target="#tones-main" hx-swap="outerHTML"
+                                    class="edit">Edit</button>
+                            <button hx-post="/admin/tones/{{ t.key }}/delete"
+                                    hx-target="#tones-main" hx-swap="outerHTML"
+                                    hx-confirm="Delete tone '{{ t.key }}'? This affects all future comment generation."
+                                    class="delete">Delete</button>
+                        </div>
+                    </div>
+                    {% if t.description %}<p class="tone-desc">{{ t.description }}</p>{% endif %}
+                    <details>
+                        <summary>Prompt</summary>
+                        <pre>{{ t.tone_prompt }}</pre>
+                    </details>
+                </div>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    </section>
+
+    <section class="shared-prompt">
+        <h2>Shared system prompt</h2>
+        <p class="hint">Applied as the system prompt for every tone. Voice, hard NOs, vocabulary, length, output format.</p>
+        <form hx-post="/admin/tones/shared" hx-target="#tones-main" hx-swap="outerHTML">
+            <textarea name="shared_system_prompt" rows="20">{{ shared_system_prompt }}</textarea>
+            <div class="form-actions">
+                <button type="submit">Save shared prompt</button>
+            </div>
+        </form>
+    </section>
+</div>

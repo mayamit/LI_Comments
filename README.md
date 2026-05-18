@@ -18,7 +18,8 @@ App runs at `http://localhost:8000`. The SQLite database auto-initialises on fir
 
 | Variable | Purpose |
 |---|---|
-| `ANTHROPIC_API_KEY` | Claude API access (comment generation) |
 | `APIFY_TOKEN` | Apify access (LinkedIn post fetching) |
 
-Optional: `FETCH_SCHEDULE_HOUR`, `FETCH_SCHEDULE_MINUTE`, `DATABASE_PATH` — see `.env.example`.
+Comment generation uses the `claude` CLI (Claude Code subscription) rather than the Anthropic API, so no API key is required. The CLI must be installed and on `PATH`. Override with `CLAUDE_CLI` and `CLAUDE_MODEL` if needed.
+
+Optional: `FETCH_SCHEDULE_HOUR`, `FETCH_SCHEDULE_MINUTE`, `DATABASE_PATH`, `CLAUDE_TIMEOUT_S` — see `.env.example`.

@@ -19,6 +19,7 @@
             {{ last_run.handles_processed }} handles ·
             <span class="ok">{{ last_run.new_posts }} new</span> ·
             <span class="muted">{{ last_run.skipped_duplicates }} duplicates</span>
+            · <span class="ok">{{ last_run.comments_generated }} comments</span>
             {% if last_run.error_count %}
             · <span class="err">{{ last_run.error_count }} errors</span>
             {% endif %}

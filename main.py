@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 import sys
 from contextlib import asynccontextmanager
 
@@ -13,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from agent import run_fetch
 from database import init_db
 from routers import admin
+from routers import tones as tones_router
 
 load_dotenv()
 logging.basicConfig(
@@ -20,7 +22,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 
-REQUIRED_ENV = ["ANTHROPIC_API_KEY", "APIFY_TOKEN"]
+REQUIRED_ENV = ["APIFY_TOKEN"]
 
 
 def check_env() -> None:
@@ -32,6 +34,13 @@ def check_env() -> None:
             + "\nCopy .env.example to .env and fill in the values.\n"
         )
         raise SystemExit(1)
+    cli = os.getenv("CLAUDE_CLI", "claude")
+    if not shutil.which(cli):
+        logging.warning(
+            "Claude CLI '%s' not found on PATH. Comment generation will fail "
+            "until this is installed or CLAUDE_CLI is set.",
+            cli,
+        )
 
 
 @asynccontextmanager
@@ -65,6 +74,7 @@ app = FastAPI(title="LI_Comments", lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(admin.router)
+app.include_router(tones_router.router)
 
 
 @app.get("/")

@@ -184,6 +184,7 @@ async def run_now(request: Request):
         f"{summary['handles_processed']} handles",
         f"{summary['new_posts']} new",
         f"{summary['skipped_duplicates']} duplicates",
+        f"{summary.get('comments_generated', 0)} comments",
     ]
     if summary["errors"]:
         parts.append(f"{len(summary['errors'])} errors")

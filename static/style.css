@@ -124,3 +124,73 @@ button[disabled] { opacity: 0.6; cursor: progress; }
 .last-run .err { color: var(--danger); font-weight: 500; }
 .run-errors { margin: 0.4rem 0 0 1.25rem; padding: 0; font-size: 0.88rem; }
 .run-errors li { color: var(--danger); }
+
+/* Tones page */
+.section-header { display: flex; justify-content: space-between; align-items: center; }
+.add-tone { background: var(--success); }
+.add-tone:hover { background: #1f6b30; }
+
+.tone-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    background: white;
+}
+.tone-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.tone-key {
+    font-family: ui-monospace, Menlo, monospace;
+    background: var(--bg-soft);
+    border-radius: 3px;
+    padding: 0.1rem 0.4rem;
+    margin-left: 0.5rem;
+    font-size: 0.82rem;
+    color: #555;
+}
+.tone-desc { margin: 0.3rem 0 0.4rem; color: #555; font-size: 0.92rem; }
+.tone-card details summary { cursor: pointer; color: var(--primary); font-size: 0.88rem; }
+.tone-card pre {
+    background: var(--bg-soft);
+    padding: 0.75rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    margin-top: 0.5rem;
+}
+
+.tone-edit-card {
+    border: 1px solid var(--primary);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #f7faff;
+}
+.tone-edit-card h3 { margin-top: 0; }
+.tone-edit-card label { display: block; margin-bottom: 0.85rem; font-size: 0.9rem; font-weight: 500; }
+.tone-edit-card label small { display: block; color: var(--muted); font-weight: 400; margin-top: 0.2rem; }
+.tone-edit-card input, .tone-edit-card textarea {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.92rem;
+}
+.tone-edit-card textarea { font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; }
+.form-actions { display: flex; gap: 0.75rem; align-items: center; margin-top: 0.5rem; }
+.form-actions a { color: var(--muted); text-decoration: none; cursor: pointer; }
+.form-actions a:hover { color: var(--fg); }
+
+.shared-prompt { margin-top: 2rem; }
+.shared-prompt .hint { color: var(--muted); font-size: 0.9rem; margin-top: -0.4rem; }
+.shared-prompt textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 0.85rem;
+}
