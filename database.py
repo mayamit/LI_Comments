@@ -1,4 +1,6 @@
 import os
+from contextlib import asynccontextmanager
+
 import aiosqlite
 
 SCHEMA = """
@@ -9,7 +11,8 @@ CREATE TABLE IF NOT EXISTS handles (
     active INTEGER DEFAULT 1,
     notes TEXT,
     created_at TEXT DEFAULT (datetime('now')),
-    last_fetched_at TEXT
+    last_fetched_at TEXT,
+    deleted_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS posts (
@@ -48,14 +51,26 @@ def db_path() -> str:
     return os.getenv("DATABASE_PATH", "./li_comments.db")
 
 
+async def _migrate(db: aiosqlite.Connection) -> None:
+    cur = await db.execute("PRAGMA table_info(handles)")
+    cols = [r[1] for r in await cur.fetchall()]
+    if "deleted_at" not in cols:
+        await db.execute("ALTER TABLE handles ADD COLUMN deleted_at TEXT")
+
+
 async def init_db() -> None:
     async with aiosqlite.connect(db_path()) as db:
         await db.executescript(SCHEMA)
+        await _migrate(db)
         await db.commit()
 
 
-async def connect() -> aiosqlite.Connection:
+@asynccontextmanager
+async def get_db():
     db = await aiosqlite.connect(db_path())
     db.row_factory = aiosqlite.Row
-    await db.execute("PRAGMA foreign_keys = ON")
-    return db
+    try:
+        await db.execute("PRAGMA foreign_keys = ON")
+        yield db
+    finally:
+        await db.close()

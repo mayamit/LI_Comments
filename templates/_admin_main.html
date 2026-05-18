@@ -1,0 +1,72 @@
+<div id="admin-main">
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+    {% if flash %}<div class="alert alert-success">{{ flash }}</div>{% endif %}
+
+    <section class="add-form">
+        <h2>Add a handle</h2>
+        <form hx-post="/admin/handles" hx-target="#admin-main" hx-swap="outerHTML" autocomplete="off">
+            <input type="text" name="linkedin_handle" placeholder="LinkedIn handle (e.g. johndoe)" required>
+            <input type="text" name="display_name" placeholder="Display name (optional)">
+            <input type="text" name="notes" placeholder="Notes (optional)">
+            <button type="submit">Add</button>
+        </form>
+    </section>
+
+    <section class="handles-list">
+        <h2>Handles ({{ handles|length }})</h2>
+        {% if not handles %}
+            <p class="empty">No handles yet. Add one above to start tracking.</p>
+        {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Handle</th>
+                    <th>Display name</th>
+                    <th>Notes</th>
+                    <th>Last fetched</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in handles %}
+                <tr class="handle-row {% if not h.active %}inactive{% endif %}">
+                    {% if edit_id == h.id %}
+                        <td>{{ h.linkedin_handle }}</td>
+                        <td colspan="5">
+                            <form class="edit-form" hx-post="/admin/handles/{{ h.id }}/edit" hx-target="#admin-main" hx-swap="outerHTML">
+                                <input type="text" name="display_name" value="{{ h.display_name or '' }}" placeholder="Display name">
+                                <input type="text" name="notes" value="{{ h.notes or '' }}" placeholder="Notes">
+                                <button type="submit">Save</button>
+                                <a href="/admin">Cancel</a>
+                            </form>
+                        </td>
+                    {% else %}
+                        <td><strong>{{ h.linkedin_handle }}</strong></td>
+                        <td>{{ h.display_name or '—' }}</td>
+                        <td>{{ h.notes or '—' }}</td>
+                        <td class="{% if h.is_stale %}stale{% endif %}">{{ h.last_fetched_display }}</td>
+                        <td>
+                            <button hx-post="/admin/handles/{{ h.id }}/toggle"
+                                    hx-target="#admin-main" hx-swap="outerHTML"
+                                    class="toggle {% if h.active %}on{% else %}off{% endif %}">
+                                {{ "On" if h.active else "Off" }}
+                            </button>
+                        </td>
+                        <td class="actions">
+                            <button hx-get="/admin/handles/{{ h.id }}/edit"
+                                    hx-target="#admin-main" hx-swap="outerHTML"
+                                    class="edit">Edit</button>
+                            <button hx-post="/admin/handles/{{ h.id }}/delete"
+                                    hx-target="#admin-main" hx-swap="outerHTML"
+                                    hx-confirm="Delete '{{ h.linkedin_handle }}'? Posts and history will be preserved."
+                                    class="delete">Delete</button>
+                        </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </section>
+</div>

@@ -4,8 +4,11 @@ from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from database import init_db
+from routers import admin
 
 load_dotenv()
 
@@ -31,6 +34,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="LI_Comments", lifespan=lifespan)
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+app.include_router(admin.router)
+
+
+@app.get("/")
+async def index():
+    return RedirectResponse(url="/admin")
 
 
 @app.get("/health")
