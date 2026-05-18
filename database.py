@@ -44,6 +44,18 @@ CREATE TABLE IF NOT EXISTS posted_log (
     posted_at TEXT DEFAULT (datetime('now')),
     notes TEXT
 );
+
+CREATE TABLE IF NOT EXISTS fetch_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    trigger TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    handles_processed INTEGER DEFAULT 0,
+    new_posts INTEGER DEFAULT 0,
+    skipped_duplicates INTEGER DEFAULT 0,
+    error_count INTEGER DEFAULT 0,
+    summary_json TEXT
+);
 """
 
 

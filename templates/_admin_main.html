@@ -2,6 +2,39 @@
     {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
     {% if flash %}<div class="alert alert-success">{{ flash }}</div>{% endif %}
 
+    <section class="agent-status">
+        <h2>Fetch agent</h2>
+        <div class="agent-controls">
+            <button hx-post="/admin/run-now"
+                    hx-target="#admin-main" hx-swap="outerHTML"
+                    hx-disabled-elt="this"
+                    hx-indicator="#run-spinner"
+                    class="run-now">Run now</button>
+            <span id="run-spinner" class="htmx-indicator">Fetching… (this can take a minute per handle)</span>
+        </div>
+        {% if last_run %}
+        <div class="last-run">
+            <strong>Last run</strong>
+            ({{ last_run.trigger }}, {{ last_run.started_display }}):
+            {{ last_run.handles_processed }} handles ·
+            <span class="ok">{{ last_run.new_posts }} new</span> ·
+            <span class="muted">{{ last_run.skipped_duplicates }} duplicates</span>
+            {% if last_run.error_count %}
+            · <span class="err">{{ last_run.error_count }} errors</span>
+            {% endif %}
+            {% if last_run.errors %}
+            <ul class="run-errors">
+                {% for e in last_run.errors %}
+                <li><strong>@{{ e.handle }}</strong>: {{ e.error }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% else %}
+        <p class="empty">No fetch runs yet.</p>
+        {% endif %}
+    </section>
+
     <section class="add-form">
         <h2>Add a handle</h2>
         <form hx-post="/admin/handles" hx-target="#admin-main" hx-swap="outerHTML" autocomplete="off">

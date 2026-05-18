@@ -6,6 +6,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from agent import get_last_run, run_fetch
 from database import get_db
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -68,11 +69,15 @@ async def _render(
     flash: Optional[str] = None,
 ):
     handles = await _fetch_handles()
+    last_run = await get_last_run()
+    if last_run:
+        last_run["started_display"] = _relative_time(last_run["started_at"])
     ctx = {
         "handles": handles,
         "edit_id": edit_id,
         "error": error,
         "flash": flash,
+        "last_run": last_run,
     }
     template = "admin.html" if full_page else "_admin_main.html"
     return templates.TemplateResponse(request, template, ctx)
@@ -167,6 +172,23 @@ async def delete_handle(request: Request, handle_id: int):
         await db.commit()
     return await _render(
         request, full_page=False, flash=f"Deleted handle '{row['linkedin_handle']}'."
+    )
+
+
+@router.post("/run-now", response_class=HTMLResponse)
+async def run_now(request: Request):
+    summary = await run_fetch(trigger="manual")
+    if summary.get("skipped"):
+        return await _render(request, full_page=False, error=summary["reason"])
+    parts = [
+        f"{summary['handles_processed']} handles",
+        f"{summary['new_posts']} new",
+        f"{summary['skipped_duplicates']} duplicates",
+    ]
+    if summary["errors"]:
+        parts.append(f"{len(summary['errors'])} errors")
+    return await _render(
+        request, full_page=False, flash="Fetch complete — " + ", ".join(parts) + "."
     )
 
 
