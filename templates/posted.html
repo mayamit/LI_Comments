@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Posted · LI_Comments{% endblock %}
+{% block content %}
+<section class="posted-page">
+    <div class="posted-header">
+        <h2>Posted</h2>
+        <p class="muted">
+            {{ rows|length }} comment{% if rows|length != 1 %}s{% endif %}
+            across {{ unique_handles }} handle{% if unique_handles != 1 %}s{% endif %}
+            {% if filter_handle or filter_from or filter_to %}<em>(filtered)</em>{% endif %}
+        </p>
+    </div>
+
+    <form method="get" action="/posted" class="filter-form">
+        <label>From
+            <input type="date" name="date_from" value="{{ filter_from }}">
+        </label>
+        <label>To
+            <input type="date" name="date_to" value="{{ filter_to }}">
+        </label>
+        <label>Handle
+            <select name="handle">
+                <option value="">All handles</option>
+                {% for h in handle_options %}
+                <option value="{{ h.linkedin_handle }}" {% if filter_handle == h.linkedin_handle %}selected{% endif %}>
+                    @{{ h.linkedin_handle }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <button type="submit">Apply</button>
+        <a href="/posted" class="btn-link-text">Clear</a>
+    </form>
+
+    {% if not rows %}
+    <div class="empty-feed">
+        <p>No comments posted yet
+        {% if filter_handle or filter_from or filter_to %}for this filter{% endif %}.
+        {% if not (filter_handle or filter_from or filter_to) %}
+        Mark a comment as posted from the <a href="/dashboard">dashboard</a> to see it here.
+        {% endif %}</p>
+    </div>
+    {% else %}
+    <table class="posted-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Handle</th>
+                <th>Name</th>
+                <th>Tone</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr>
+                <td class="date-cell">
+                    <div class="date-abs">{{ r.posted_at }}</div>
+                    <div class="muted small">{{ r.posted_at_display }}</div>
+                </td>
+                <td>
+                    <span class="history-handle">@{{ r.handle }}</span>
+                    {% if r.handle_deleted %}<em class="muted small">(deleted)</em>{% endif %}
+                </td>
+                <td>{{ r.display_name }}</td>
+                <td><span class="tone-pill">{{ r.tone_name }}</span></td>
+                <td class="open-cell">
+                    {% if r.post_url %}
+                    <a href="{{ r.post_url }}" target="_blank" rel="noopener" class="btn-link-text">Open ↗</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</section>
+{% endblock %}

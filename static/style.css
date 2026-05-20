@@ -501,3 +501,37 @@ button[disabled] { opacity: 0.6; cursor: progress; }
     line-height: 1.55;
     font-size: 0.94rem;
 }
+
+/* Posted (compact) page */
+.posted-page { }
+.posted-header { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+.posted-header h2 { margin: 0; }
+.posted-header .muted { margin: 0; font-size: 0.9rem; }
+
+.posted-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    font-size: 0.93rem;
+}
+.posted-table thead th {
+    text-align: left;
+    background: var(--bg-soft);
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.82rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+}
+.posted-table tbody td {
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+.posted-table tbody tr:hover { background: #fbfbfc; }
+
+.date-cell .date-abs { font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; }
+.small { font-size: 0.78rem; }
+.open-cell { text-align: right; white-space: nowrap; }
