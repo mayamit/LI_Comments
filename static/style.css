@@ -529,56 +529,70 @@ button[disabled] { opacity: 0.6; cursor: progress; }
     width: 100%;
     border-collapse: collapse;
     margin-top: 1rem;
-    font-size: 0.93rem;
+    font-size: 0.88rem;
 }
 .posted-table thead th {
     text-align: left;
     background: var(--bg-soft);
-    padding: 0.55rem 0.7rem;
+    padding: 0.45rem 0.65rem;
     border-bottom: 1px solid var(--border);
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     font-weight: 600;
+    white-space: nowrap;
 }
 .posted-table tbody td {
-    padding: 0.55rem 0.7rem;
+    padding: 0.4rem 0.65rem;
     border-bottom: 1px solid var(--border);
-    vertical-align: top;
+    vertical-align: middle;
+    white-space: nowrap;
 }
 .posted-table tbody tr:hover { background: #fbfbfc; }
 
-.date-cell .date-abs { font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; }
+.posted-table .date-cell { font-family: ui-monospace, Menlo, monospace; font-size: 0.82rem; }
+.posted-table .name-cell { color: var(--fg); }
+.posted-table .tone-cell .tone-pill { white-space: nowrap; }
+.posted-table .open-cell { text-align: right; }
+.posted-table .open-cell a { font-size: 1rem; text-decoration: none; padding: 0.1rem 0.4rem; }
+
 .small { font-size: 0.78rem; }
 .open-cell { text-align: right; white-space: nowrap; }
 
-/* Rating widget */
+/* Rating widget — text-style stars, never wrap */
 .rating-widget {
     display: inline-flex;
     align-items: center;
-    gap: 0;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+.rating-widget .star,
+.rating-widget .rating-clear {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    font-size: 1rem !important;
+    line-height: 1;
+    cursor: pointer;
+    width: 1.15rem;
+    text-align: center;
 }
 .rating-widget .star {
-    background: none;
-    border: none;
-    padding: 0 0.1rem;
-    color: #ddd;
-    font-size: 1.1rem;
-    cursor: pointer;
-    line-height: 1;
+    color: #d8d8d8 !important;
 }
-.rating-widget .star:hover { color: #f6c04d; }
-.rating-widget .star.filled { color: #f6a800; }
+.rating-widget .star:hover { color: #f6c04d !important; }
+.rating-widget .star.filled { color: #f6a800 !important; }
 .rating-widget .rating-clear {
-    background: none;
-    border: none;
-    color: var(--muted);
-    font-size: 0.95rem;
-    padding: 0 0.2rem 0 0.4rem;
-    cursor: pointer;
+    color: transparent !important;
+    margin-left: 0.2rem !important;
+    width: 0.9rem;
+    font-size: 0.85rem !important;
 }
-.rating-widget .rating-clear:hover { color: var(--danger); }
+.rating-widget:hover .rating-clear { color: #bbb !important; }
+.rating-widget .rating-clear:hover { color: var(--danger) !important; }
 
 .rating-display {
     background: #fff4d4;

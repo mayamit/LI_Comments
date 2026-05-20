@@ -56,19 +56,19 @@
             {% for r in rows %}
             <tr>
                 <td class="date-cell">
-                    <div class="date-abs">{{ r.posted_at }}</div>
-                    <div class="muted small">{{ r.posted_at_display }}</div>
+                    {{ r.posted_at[:16] }}
+                    <span class="muted small">· {{ r.posted_at_display }}</span>
                 </td>
-                <td>
+                <td class="handle-cell">
                     <span class="history-handle">@{{ r.handle }}</span>
                     {% if r.handle_deleted %}<em class="muted small">(deleted)</em>{% endif %}
                 </td>
-                <td>{{ r.display_name }}</td>
-                <td><span class="tone-pill">{{ r.tone_name }}</span></td>
-                <td>{% with log_id=r.log_id, rating=r.rating %}{% include "_rating.html" %}{% endwith %}</td>
+                <td class="name-cell">{{ r.display_name }}</td>
+                <td class="tone-cell"><span class="tone-pill">{{ r.tone_name }}</span></td>
+                <td class="rating-cell">{% with log_id=r.log_id, rating=r.rating %}{% include "_rating.html" %}{% endwith %}</td>
                 <td class="open-cell">
                     {% if r.post_url %}
-                    <a href="{{ r.post_url }}" target="_blank" rel="noopener" class="btn-link-text">Open ↗</a>
+                    <a href="{{ r.post_url }}" target="_blank" rel="noopener" class="btn-link-text" title="Open on LinkedIn">↗</a>
                     {% endif %}
                 </td>
             </tr>
