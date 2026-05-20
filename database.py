@@ -42,7 +42,9 @@ CREATE TABLE IF NOT EXISTS posted_log (
     comment_id INTEGER REFERENCES generated_comments(id),
     tone TEXT,
     posted_at TEXT DEFAULT (datetime('now')),
-    notes TEXT
+    notes TEXT,
+    rating INTEGER,
+    rated_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS fetch_runs (
@@ -68,6 +70,13 @@ async def _migrate(db: aiosqlite.Connection) -> None:
     cols = [r[1] for r in await cur.fetchall()]
     if "deleted_at" not in cols:
         await db.execute("ALTER TABLE handles ADD COLUMN deleted_at TEXT")
+
+    cur = await db.execute("PRAGMA table_info(posted_log)")
+    cols = [r[1] for r in await cur.fetchall()]
+    if "rating" not in cols:
+        await db.execute("ALTER TABLE posted_log ADD COLUMN rating INTEGER")
+    if "rated_at" not in cols:
+        await db.execute("ALTER TABLE posted_log ADD COLUMN rated_at TEXT")
 
 
 async def init_db() -> None:

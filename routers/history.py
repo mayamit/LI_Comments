@@ -13,6 +13,36 @@ router = APIRouter(prefix="/history", tags=["history"])
 templates = Jinja2Templates(directory="templates")
 
 
+async def _fetch_tone_breakdown() -> list[dict]:
+    """Per-tone count of posted comments and average rating where rated."""
+    async with get_db() as db:
+        cur = await db.execute(
+            """
+            SELECT tone,
+                   COUNT(*) AS posts,
+                   AVG(rating) AS avg_rating,
+                   COUNT(rating) AS rated_count
+            FROM posted_log
+            GROUP BY tone
+            ORDER BY (avg_rating IS NULL), avg_rating DESC, posts DESC
+            """
+        )
+        rows = await cur.fetchall()
+    breakdown = []
+    for r in rows:
+        tone_meta = tones_store.get(r["tone"]) or {}
+        breakdown.append(
+            {
+                "tone": r["tone"],
+                "name": tone_meta.get("name", r["tone"]),
+                "posts": r["posts"],
+                "avg_rating": round(r["avg_rating"], 2) if r["avg_rating"] is not None else None,
+                "rated_count": r["rated_count"] or 0,
+            }
+        )
+    return breakdown
+
+
 async def _fetch_stats() -> dict:
     async with get_db() as db:
         cur = await db.execute(
@@ -149,6 +179,7 @@ async def history_page(
     date_from = date_from or None
     date_to = date_to or None
     stats = await _fetch_stats()
+    tone_breakdown = await _fetch_tone_breakdown()
     rows = await _fetch_history(handle, date_from, date_to)
     handle_options = await _fetch_handle_options()
     return templates.TemplateResponse(
@@ -156,6 +187,7 @@ async def history_page(
         "history.html",
         {
             "stats": stats,
+            "tone_breakdown": tone_breakdown,
             "rows": rows,
             "handle_options": handle_options,
             "filter_handle": handle or "",

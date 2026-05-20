@@ -48,6 +48,7 @@
                 <th>Handle</th>
                 <th>Name</th>
                 <th>Tone</th>
+                <th>Rating</th>
                 <th></th>
             </tr>
         </thead>
@@ -64,6 +65,7 @@
                 </td>
                 <td>{{ r.display_name }}</td>
                 <td><span class="tone-pill">{{ r.tone_name }}</span></td>
+                <td>{% with log_id=r.log_id, rating=r.rating %}{% include "_rating.html" %}{% endwith %}</td>
                 <td class="open-cell">
                     {% if r.post_url %}
                     <a href="{{ r.post_url }}" target="_blank" rel="noopener" class="btn-link-text">Open ↗</a>

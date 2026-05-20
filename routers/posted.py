@@ -6,7 +6,7 @@ this page is for the quick "did I already post to X?" check.
 """
 from typing import Optional
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -52,7 +52,7 @@ async def _fetch_rows(
     async with get_db() as db:
         cur = await db.execute(
             f"""
-            SELECT pl.id AS log_id, pl.tone, pl.posted_at,
+            SELECT pl.id AS log_id, pl.tone, pl.posted_at, pl.rating,
                    h.linkedin_handle, h.display_name,
                    h.deleted_at AS handle_deleted_at,
                    p.url AS post_url
@@ -80,6 +80,7 @@ async def _fetch_rows(
                 "display_name": r["display_name"] or r["linkedin_handle"],
                 "handle_deleted": r["handle_deleted_at"] is not None,
                 "post_url": r["post_url"],
+                "rating": r["rating"],
             }
         )
     return out
@@ -87,6 +88,25 @@ async def _fetch_rows(
 
 def _unique_handles_count(rows: list[dict]) -> int:
     return len({r["handle"] for r in rows})
+
+
+@router.post("/{log_id}/rate", response_class=HTMLResponse)
+async def rate(request: Request, log_id: int, rating: int = Form(...)):
+    if rating < 0 or rating > 5:
+        raise HTTPException(400, "rating must be 0-5 (0 clears)")
+    new_value = rating if rating > 0 else None
+    async with get_db() as db:
+        cur = await db.execute("SELECT id FROM posted_log WHERE id = ?", (log_id,))
+        if not await cur.fetchone():
+            raise HTTPException(404, "posted_log row not found")
+        await db.execute(
+            "UPDATE posted_log SET rating = ?, rated_at = datetime('now') WHERE id = ?",
+            (new_value, log_id),
+        )
+        await db.commit()
+    return templates.TemplateResponse(
+        request, "_rating.html", {"log_id": log_id, "rating": new_value}
+    )
 
 
 @router.get("", response_class=HTMLResponse)

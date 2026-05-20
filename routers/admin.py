@@ -31,8 +31,19 @@ def _is_stale(iso: Optional[str]) -> bool:
 async def _fetch_handles():
     async with get_db() as db:
         cur = await db.execute(
-            "SELECT id, linkedin_handle, display_name, active, notes, last_fetched_at "
-            "FROM handles WHERE deleted_at IS NULL ORDER BY linkedin_handle"
+            """
+            SELECT h.id, h.linkedin_handle, h.display_name, h.active, h.notes,
+                   h.last_fetched_at,
+                   COUNT(pl.id) AS posts_count,
+                   AVG(pl.rating) AS avg_rating,
+                   COUNT(pl.rating) AS rated_count
+            FROM handles h
+            LEFT JOIN posts p ON p.handle_id = h.id
+            LEFT JOIN posted_log pl ON pl.post_id = p.id
+            WHERE h.deleted_at IS NULL
+            GROUP BY h.id
+            ORDER BY h.linkedin_handle
+            """
         )
         rows = await cur.fetchall()
     return [
@@ -45,6 +56,9 @@ async def _fetch_handles():
             "last_fetched_at": r["last_fetched_at"],
             "last_fetched_display": _relative_time(r["last_fetched_at"]),
             "is_stale": _is_stale(r["last_fetched_at"]),
+            "posts_count": r["posts_count"] or 0,
+            "avg_rating": round(r["avg_rating"], 1) if r["avg_rating"] is not None else None,
+            "rated_count": r["rated_count"] or 0,
         }
         for r in rows
     ]

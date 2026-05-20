@@ -1,0 +1,20 @@
+<span class="rating-widget" id="rating-{{ log_id }}">
+    {% for n in range(1, 6) %}
+    <button hx-post="/posted/{{ log_id }}/rate"
+            hx-vals='{"rating": "{{ n }}"}'
+            hx-target="#rating-{{ log_id }}"
+            hx-swap="outerHTML"
+            class="star {% if rating and rating >= n %}filled{% endif %}"
+            title="{{ n }} star{% if n > 1 %}s{% endif %}"
+            type="button">★</button>
+    {% endfor %}
+    {% if rating %}
+    <button hx-post="/posted/{{ log_id }}/rate"
+            hx-vals='{"rating": "0"}'
+            hx-target="#rating-{{ log_id }}"
+            hx-swap="outerHTML"
+            class="rating-clear"
+            title="Clear rating"
+            type="button">×</button>
+    {% endif %}
+</span>

@@ -37,6 +37,25 @@
         {% endfor %}
     </div>
     {% endif %}
+
+    {% if tone_breakdown %}
+    <div class="tone-breakdown">
+        <strong>By tone:</strong>
+        <div class="tone-breakdown-grid">
+            {% for t in tone_breakdown %}
+            <div class="tone-breakdown-row">
+                <span class="tone-pill">{{ t.name }}</span>
+                <span class="muted">{{ t.posts }} posted</span>
+                {% if t.avg_rating is not none %}
+                <span class="rating-display" title="{{ t.rated_count }} rated">{{ t.avg_rating }}★</span>
+                {% else %}
+                <span class="muted small">no ratings yet</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 </section>
 
 <section class="history-filters">

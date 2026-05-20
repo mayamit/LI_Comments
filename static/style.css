@@ -552,3 +552,57 @@ button[disabled] { opacity: 0.6; cursor: progress; }
 .date-cell .date-abs { font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; }
 .small { font-size: 0.78rem; }
 .open-cell { text-align: right; white-space: nowrap; }
+
+/* Rating widget */
+.rating-widget {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+}
+.rating-widget .star {
+    background: none;
+    border: none;
+    padding: 0 0.1rem;
+    color: #ddd;
+    font-size: 1.1rem;
+    cursor: pointer;
+    line-height: 1;
+}
+.rating-widget .star:hover { color: #f6c04d; }
+.rating-widget .star.filled { color: #f6a800; }
+.rating-widget .rating-clear {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 0.95rem;
+    padding: 0 0.2rem 0 0.4rem;
+    cursor: pointer;
+}
+.rating-widget .rating-clear:hover { color: var(--danger); }
+
+.rating-display {
+    background: #fff4d4;
+    color: #8a6d11;
+    border-radius: 3px;
+    padding: 0.05rem 0.45rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* Handles aggregate columns */
+.metric { text-align: center; color: var(--muted); }
+
+/* Tone breakdown on history page */
+.tone-breakdown { margin-top: 0.5rem; }
+.tone-breakdown-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0.45rem 0.85rem;
+    margin-top: 0.3rem;
+}
+.tone-breakdown-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.9rem;
+}

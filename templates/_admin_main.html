@@ -58,6 +58,8 @@
                     <th>Display name</th>
                     <th>Notes</th>
                     <th>Last fetched</th>
+                    <th title="Comments you posted from this handle">Posts</th>
+                    <th title="Average rating across rated comments">Avg ★</th>
                     <th>Active</th>
                     <th>Actions</th>
                 </tr>
@@ -67,7 +69,7 @@
                 <tr class="handle-row {% if not h.active %}inactive{% endif %}">
                     {% if edit_id == h.id %}
                         <td>{{ h.linkedin_handle }}</td>
-                        <td colspan="5">
+                        <td colspan="7">
                             <form class="edit-form" hx-post="/admin/handles/{{ h.id }}/edit" hx-target="#admin-main" hx-swap="outerHTML">
                                 <input type="text" name="display_name" value="{{ h.display_name or '' }}" placeholder="Display name">
                                 <input type="text" name="notes" value="{{ h.notes or '' }}" placeholder="Notes">
@@ -80,6 +82,12 @@
                         <td>{{ h.display_name or '—' }}</td>
                         <td>{{ h.notes or '—' }}</td>
                         <td class="{% if h.is_stale %}stale{% endif %}">{{ h.last_fetched_display }}</td>
+                        <td class="metric">{{ h.posts_count if h.posts_count else '—' }}</td>
+                        <td class="metric">
+                            {% if h.avg_rating is not none %}
+                                <span class="rating-display" title="{{ h.rated_count }} rated">{{ h.avg_rating }}★</span>
+                            {% else %}—{% endif %}
+                        </td>
                         <td>
                             <button hx-post="/admin/handles/{{ h.id }}/toggle"
                                     hx-target="#admin-main" hx-swap="outerHTML"
