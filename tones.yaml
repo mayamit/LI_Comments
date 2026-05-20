@@ -88,6 +88,7 @@ tones:
     In Amit's voice (example reply): "Curious how you decided where the
     human sits in this loop. The choice of where judgment lives usually
     determines whether the system survives production."
+    Not needed to start with "Curious" every single time.
 - key: contrarian
   name: Contrarian
   description: Respectful pushback or alternative view
