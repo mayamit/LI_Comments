@@ -32,20 +32,24 @@
         </div>
     </header>
 
-    <div class="post-engagement">
-        {% set e = p.engagement %}
-        {% if e.reactions is not none %}<span>♥ {{ e.reactions }}</span>{% endif %}
-        {% if e.comments is not none %}<span>💬 {{ e.comments }}</span>{% endif %}
-        {% if e.reposts is not none %}<span>↻ {{ e.reposts }}</span>{% endif %}
-    </div>
+    <div class="post-body-split">
+    <section class="post-pane post-content-pane">
+        <h3 class="pane-label">Post</h3>
+        <div class="post-engagement">
+            {% set e = p.engagement %}
+            {% if e.reactions is not none %}<span>♥ {{ e.reactions }}</span>{% endif %}
+            {% if e.comments is not none %}<span>💬 {{ e.comments }}</span>{% endif %}
+            {% if e.reposts is not none %}<span>↻ {{ e.reposts }}</span>{% endif %}
+        </div>
+        <div class="post-full">{{ p.full_content or '(no post content)' }}</div>
+    </section>
 
-    <div class="post-preview">{{ p.preview }}</div>
-
-    {% if p.comment_count == 0 %}
-    <div class="no-comments">No comments generated yet for this post.</div>
-    {% endif %}
-
-    <div class="tone-blocks">
+    <section class="post-pane post-comments-pane">
+        <h3 class="pane-label">Comment options</h3>
+        {% if p.comment_count == 0 %}
+        <div class="no-comments">No comments generated yet for this post.</div>
+        {% endif %}
+        <div class="tone-blocks">
         {% for tb in p.tone_blocks %}
         <div class="comment-block {% if tb.is_posted %}is-posted{% endif %}" id="comment-{{ p.id }}-{{ tb.key }}">
             <div class="tone-label">
@@ -89,5 +93,7 @@
             {% endif %}
         </div>
         {% endfor %}
+        </div>
+    </section>
     </div>
 </article>

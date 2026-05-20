@@ -328,6 +328,39 @@ button[disabled] { opacity: 0.6; cursor: progress; }
     color: var(--muted); font-style: italic; padding: 0.5rem 0; font-size: 0.9rem;
 }
 
+/* Dashboard two-pane layout: post on left, comments on right */
+.post-body-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1.25rem;
+    margin-top: 0.6rem;
+}
+.post-pane { min-width: 0; }
+.pane-label {
+    margin: 0 0 0.4rem;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    font-weight: 600;
+}
+.post-full {
+    white-space: pre-wrap;
+    line-height: 1.6;
+    background: var(--bg-soft);
+    padding: 0.85rem 1rem;
+    border-radius: 6px;
+    font-size: 0.94rem;
+    border-left: 3px solid var(--border);
+}
+
+@media (max-width: 900px) {
+    .post-body-split {
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
+    }
+}
+
 .tone-blocks { display: flex; flex-direction: column; gap: 0.65rem; }
 .comment-block {
     border: 1px solid var(--border);
