@@ -158,15 +158,43 @@ def _extract_url(item: dict) -> Optional[str]:
     return None
 
 
+def _author_handle_from_url(url: Any) -> Optional[str]:
+    if not isinstance(url, str):
+        return None
+    import re
+    m = re.search(r"/(?:in|company)/([^/?#]+)", url)
+    return m.group(1) if m else None
+
+
+def _extract_content(item: dict) -> Optional[str]:
+    """Main post body. Falls back to repost.content when the user reshared
+    something without adding their own commentary — common on LinkedIn.
+    """
+    direct = _to_text(item.get("content")) or _to_text(item.get("text"))
+    if direct and direct.strip():
+        return direct
+    repost = item.get("repost")
+    if isinstance(repost, dict):
+        nested = _to_text(repost.get("content")) or _to_text(repost.get("text"))
+        if nested and nested.strip():
+            author = repost.get("author") or {}
+            author_name = (
+                _to_text(author.get("name"))
+                or _to_text(author.get("fullName"))
+                or _author_handle_from_url(author.get("linkedinUrl"))
+                or "another user"
+            )
+            return f"[Reshared from {author_name} without commentary]\n\n{nested}"
+    return None
+
+
 async def _insert_post_if_new(handle_id: int, post_id: str, item: dict) -> Optional[int]:
     """Returns the new posts.id if inserted, None if duplicate."""
     async with get_db() as db:
         cur = await db.execute("SELECT 1 FROM posts WHERE post_id = ?", (post_id,))
         if await cur.fetchone():
             return None
-        content = _normalize_content(
-            _to_text(item.get("content")) or _to_text(item.get("text"))
-        )
+        content = _normalize_content(_extract_content(item))
         url = _extract_url(item)
         posted_at = _extract_posted_at(item)
         engagement_json = json.dumps(
