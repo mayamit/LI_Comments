@@ -44,8 +44,8 @@ shared_system_prompt: |
     accountability. One per comment max.
 
   LENGTH
-  - 60 words maximum. Tighter is better.
-  - The concise tone overrides this and demands a single sentence.
+  - 90 words maximum. Tighter is better.
+  - The concise tone overrides this and demands a single sentence, or two at the maximum.
 
   OUTPUT
   - Return only the comment text. No preamble, no quotes, no labels, no
@@ -128,3 +128,16 @@ tones:
     usually arrives during execution…"
     "The day AI starts reading everything carefully is the day our
     'temporary shortcuts' finally get audited."
+- key: reference
+  name: Popular Reference
+  description: Citing reference from a popular book, song, or popular culture
+  tone_prompt: |
+    Write a comment that:
+
+    Is 3–5 sentences max — tight, no fluff
+    Opens with a hook — a surprising angle, a contrarian take, or a bold observation
+    Weaves in a reference from a book, film, music, art, architecture, sport, or pop culture (e.g. LEGO, Pixar, Hemingway, Pink Floyd, tennis) — use it as a metaphor or lens, not a name-drop
+    Feels like it comes from someone well-read and curious, not a consultant rattling off buzzwords
+    Ends with either a sharp one-liner or an open question that invites replies
+    Tone: conversational and a little irreverent — like a smart friend at a dinner table, not a keynote speaker
+  active: true
