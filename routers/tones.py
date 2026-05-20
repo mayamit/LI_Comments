@@ -86,6 +86,19 @@ async def delete_tone(request: Request, key: str):
     return await _render(request, full_page=False, flash=f"Deleted tone '{key}'.")
 
 
+@router.post("/{key}/toggle", response_class=HTMLResponse)
+async def toggle_active(request: Request, key: str):
+    try:
+        current = tones_store.get(key)
+        if current is None:
+            return await _render(request, full_page=False, error=f"Tone '{key}' not found.")
+        tones_store.set_active(key, not tones_store.is_active(current))
+    except tones_store.ToneError as e:
+        return await _render(request, full_page=False, error=str(e))
+    new_state = "enabled" if tones_store.is_active(tones_store.get(key)) else "disabled"
+    return await _render(request, full_page=False, flash=f"Tone '{key}' {new_state}.")
+
+
 @router.post("/shared", response_class=HTMLResponse)
 async def save_shared_prompt(request: Request, shared_system_prompt: str = Form(...)):
     tones_store.update_shared_prompt(shared_system_prompt)

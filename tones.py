@@ -63,8 +63,17 @@ def get_shared_system_prompt() -> str:
     return load()["shared_system_prompt"]
 
 
+def is_active(tone: dict) -> bool:
+    """Tones default to active when the 'active' field is missing."""
+    return bool(tone.get("active", True))
+
+
 def get_all() -> list[dict]:
     return load()["tones"]
+
+
+def get_active() -> list[dict]:
+    return [t for t in load()["tones"] if is_active(t)]
 
 
 def get(key: str) -> Optional[dict]:
@@ -72,6 +81,16 @@ def get(key: str) -> Optional[dict]:
         if t["key"] == key:
             return t
     return None
+
+
+def set_active(key: str, active: bool) -> None:
+    data = load()
+    for t in data["tones"]:
+        if t["key"] == key:
+            t["active"] = bool(active)
+            _save(data)
+            return
+    raise ToneError(f"Tone '{key}' not found.")
 
 
 def _validate(key: str, name: str, tone_prompt: str) -> None:

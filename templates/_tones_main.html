@@ -68,13 +68,20 @@
                     </form>
                 </div>
                 {% else %}
-                <div class="tone-card">
+                {% set tone_active = t.active is not defined or t.active %}
+                <div class="tone-card {% if not tone_active %}tone-disabled{% endif %}">
                     <div class="tone-header">
                         <div>
                             <strong>{{ t.name }}</strong>
                             <code class="tone-key">{{ t.key }}</code>
+                            {% if not tone_active %}<span class="disabled-badge">Disabled</span>{% endif %}
                         </div>
                         <div class="tone-actions">
+                            <button hx-post="/admin/tones/{{ t.key }}/toggle"
+                                    hx-target="#tones-main" hx-swap="outerHTML"
+                                    class="toggle {% if tone_active %}on{% else %}off{% endif %}">
+                                {{ "Enabled" if tone_active else "Disabled" }}
+                            </button>
                             <button hx-get="/admin/tones/{{ t.key }}/edit"
                                     hx-target="#tones-main" hx-swap="outerHTML"
                                     class="edit">Edit</button>

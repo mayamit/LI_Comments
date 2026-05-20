@@ -148,6 +148,23 @@ button[disabled] { opacity: 0.6; cursor: progress; }
     color: #555;
 }
 .tone-desc { margin: 0.3rem 0 0.4rem; color: #555; font-size: 0.92rem; }
+.tone-card.tone-disabled { opacity: 0.55; background: #fafafa; }
+.tone-card.tone-disabled strong { color: var(--muted); }
+.disabled-badge {
+    background: #888;
+    color: white;
+    border-radius: 3px;
+    padding: 0.1rem 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-left: 0.4rem;
+}
+.tone-actions button.toggle { min-width: 70px; }
+.tone-actions button.toggle.on { background: var(--success); }
+.tone-actions button.toggle.off { background: #888; }
+
 .tone-card details summary { cursor: pointer; color: var(--primary); font-size: 0.88rem; }
 .tone-card pre {
     background: var(--bg-soft);

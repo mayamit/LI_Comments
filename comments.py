@@ -173,7 +173,7 @@ async def generate_for_post(post_id: int) -> dict:
 
     data = tones_store.load()
     shared = data["shared_system_prompt"]
-    tones = data["tones"]
+    tones = [t for t in data["tones"] if tones_store.is_active(t)]
 
     async with get_db() as db:
         await db.execute("DELETE FROM generated_comments WHERE post_id = ?", (post_id,))
