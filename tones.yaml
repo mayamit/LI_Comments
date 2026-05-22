@@ -49,7 +49,7 @@ shared_system_prompt: |
 
   OUTPUT
   - Return only the comment text. No preamble, no quotes, no labels, no
-    signature.
+    signature. Do not use short sentences, make it much more natural and human.
 tones:
 - key: operator
   name: Operator Lens

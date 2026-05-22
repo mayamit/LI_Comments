@@ -5,12 +5,25 @@
     <section class="agent-status">
         <h2>Fetch agent</h2>
         <div class="agent-controls">
-            <button hx-post="/admin/run-now"
-                    hx-target="#admin-main" hx-swap="outerHTML"
-                    hx-disabled-elt="this"
-                    hx-indicator="#run-spinner"
-                    class="run-now">Run now</button>
+            <form hx-post="/admin/run-now" hx-target="#admin-main" hx-swap="outerHTML" style="display:inline;">
+                <input type="hidden" name="selected_tags" value="{{ selected_tags_param }}">
+                <button type="submit"
+                        hx-disabled-elt="this"
+                        hx-indicator="#run-spinner"
+                        class="run-now">Run now</button>
+            </form>
             <span id="run-spinner" class="htmx-indicator">Fetching… (this can take a minute per handle)</span>
+            <form hx-post="/admin/auto-tag" hx-target="#admin-main" hx-swap="outerHTML"
+                  hx-confirm="Run profile enrichment over handles that currently have no tags? This calls Apify once per handle and Claude once per handle for persona tagging."
+                  style="display:inline; margin-left: 0.5rem;">
+                <input type="hidden" name="selected_tags" value="{{ selected_tags_param }}">
+                <button type="submit"
+                        hx-disabled-elt="this"
+                        hx-indicator="#autotag-spinner"
+                        class="btn-secondary"
+                        title="For handles with no tags yet: fetch profile data, set reach/cadence/persona tags, refresh display names">Auto-tag untagged</button>
+            </form>
+            <span id="autotag-spinner" class="htmx-indicator">Enriching… (this takes ~30s per handle)</span>
         </div>
         {% if last_run %}
         <div class="last-run">
@@ -36,9 +49,48 @@
         {% endif %}
     </section>
 
+    {% if recommendations %}
+    <details class="recommendations" open>
+        <summary><h2 style="display:inline; margin: 0;">Recommended to activate ({{ recommendations|length }})</h2></summary>
+        <p class="muted small" style="margin: 0.3rem 0 0.5rem;">
+            Score combines engagement (posts, ratings), your-care (notes, display name), tags
+            (intent, reach, persona, cadence), and a recency penalty if you posted recently —
+            unless they're <strong>hiring-signal</strong> or <strong>investor-vc/pe</strong>.
+        </p>
+        <table class="rec-table">
+            <tbody>
+                {% for r in recommendations %}
+                <tr>
+                    <td class="rec-score-cell"><span class="rec-score">{{ r.score }}</span></td>
+                    <td class="rec-handle-cell">
+                        <strong>{{ r.linkedin_handle }}</strong>
+                        {% if r.display_name %}<span class="muted"> — {{ r.display_name }}</span>{% endif %}
+                    </td>
+                    <td class="rec-reasons-cell">
+                        {% for delta, label in r.reasons %}
+                            <span class="rec-reason {% if delta > 0 %}plus{% elif delta < 0 %}minus{% else %}zero{% endif %}">
+                                {%- if delta > 0 %}+{{ delta }} {% elif delta < 0 %}{{ delta }} {% endif -%}
+                                {{ label }}
+                            </span>
+                        {% endfor %}
+                    </td>
+                    <td class="rec-action-cell">
+                        <form hx-post="/admin/handles/{{ r.id }}/toggle" hx-target="#admin-main" hx-swap="outerHTML" style="display:inline;">
+                            <input type="hidden" name="selected_tags" value="{{ selected_tags_param }}">
+                            <button type="submit" class="btn-small rec-activate">Activate</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </details>
+    {% endif %}
+
     <section class="add-form">
         <h2>Add a handle</h2>
         <form hx-post="/admin/handles" hx-target="#admin-main" hx-swap="outerHTML" autocomplete="off">
+            <input type="hidden" name="selected_tags" value="{{ selected_tags_param }}">
             <input type="text" name="linkedin_handle" placeholder="LinkedIn handle (e.g. johndoe)" required>
             <input type="text" name="display_name" placeholder="Display name (optional)">
             <input type="text" name="notes" placeholder="Notes (optional)">
@@ -46,18 +98,63 @@
         </form>
     </section>
 
+    <section class="tag-filters">
+        <div class="tag-filters-header">
+            <h2>Filter by tag</h2>
+            {% if selected_tags %}
+            <a href="/admin"
+               hx-get="/admin"
+               hx-target="#admin-main" hx-swap="outerHTML"
+               hx-push-url="true"
+               class="btn-link-text">Clear filters</a>
+            {% endif %}
+            <a href="/admin/tags" class="btn-link-text">Manage tags →</a>
+        </div>
+        {% for d in dimensions %}
+            {% if all_tags_grouped[d] %}
+            <div class="filter-row">
+                <span class="filter-dim filter-dim-{{ d }}">{{ dimension_labels[d] }}</span>
+                <div class="filter-chips">
+                    {% for t in all_tags_grouped[d] %}
+                        {% set is_active = t.slug in selected_tags %}
+                        {% if is_active %}
+                            {% set new_tags = selected_tags | reject('equalto', t.slug) | list %}
+                        {% else %}
+                            {% set new_tags = selected_tags + [t.slug] %}
+                        {% endif %}
+                        <a hx-get="/admin?tags={{ new_tags | join(',') }}"
+                           hx-target="#admin-main" hx-swap="outerHTML"
+                           hx-push-url="true"
+                           href="/admin?tags={{ new_tags | join(',') }}"
+                           class="tag-chip tag-dim-{{ t.dimension }} {% if is_active %}active{% endif %}"
+                           title="{{ t.description or '' }}">{{ t.label }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+    </section>
+
     <section class="handles-list">
-        <h2>Handles ({{ handles|length }})</h2>
+        <h2>Handles ({{ handles|length }}{% if selected_tags %} filtered{% endif %})</h2>
         {% if not handles %}
-            <p class="empty">No handles yet. Add one above to start tracking.</p>
+            <p class="empty">
+                {% if selected_tags %}
+                    No handles match the selected tags.
+                {% else %}
+                    No handles yet. Add one above to start tracking.
+                {% endif %}
+            </p>
         {% else %}
         <table>
             <thead>
                 <tr>
                     <th>Handle</th>
                     <th>Display name</th>
+                    <th>Tags</th>
                     <th>Notes</th>
                     <th>Last fetched</th>
+                    <th title="Most recent time you posted a comment on this handle">Last posted</th>
                     <th title="Comments you posted from this handle">Posts</th>
                     <th title="Average rating across rated comments">Avg ★</th>
                     <th>Active</th>
@@ -69,19 +166,50 @@
                 <tr class="handle-row {% if not h.active %}inactive{% endif %}">
                     {% if edit_id == h.id %}
                         <td>{{ h.linkedin_handle }}</td>
-                        <td colspan="7">
-                            <form class="edit-form" hx-post="/admin/handles/{{ h.id }}/edit" hx-target="#admin-main" hx-swap="outerHTML">
-                                <input type="text" name="display_name" value="{{ h.display_name or '' }}" placeholder="Display name">
-                                <input type="text" name="notes" value="{{ h.notes or '' }}" placeholder="Notes">
-                                <button type="submit">Save</button>
-                                <a href="/admin">Cancel</a>
+                        <td colspan="9">
+                            <form class="edit-form handle-edit-form" hx-post="/admin/handles/{{ h.id }}/edit" hx-target="#admin-main" hx-swap="outerHTML">
+                                <input type="hidden" name="selected_tags" value="{{ selected_tags_param }}">
+                                <div class="edit-row">
+                                    <input type="text" name="display_name" value="{{ h.display_name or '' }}" placeholder="Display name">
+                                    <input type="text" name="notes" value="{{ h.notes or '' }}" placeholder="Notes">
+                                </div>
+                                <div class="tag-picker">
+                                    {% for d in dimensions %}
+                                        {% if all_tags_grouped[d] %}
+                                        <fieldset class="tag-picker-group">
+                                            <legend class="filter-dim filter-dim-{{ d }}">{{ dimension_labels[d] }}</legend>
+                                            {% for t in all_tags_grouped[d] %}
+                                            <label class="tag-checkbox">
+                                                <input type="checkbox" name="tag_ids" value="{{ t.id }}"
+                                                    {% if t.id in h.tag_ids %}checked{% endif %}>
+                                                <span class="tag-chip tag-dim-{{ t.dimension }}">{{ t.label }}</span>
+                                            </label>
+                                            {% endfor %}
+                                        </fieldset>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit">Save</button>
+                                    <a href="/admin{% if selected_tags %}?tags={{ selected_tags_param }}{% endif %}"
+                                       hx-get="/admin{% if selected_tags %}?tags={{ selected_tags_param }}{% endif %}"
+                                       hx-target="#admin-main" hx-swap="outerHTML">Cancel</a>
+                                </div>
                             </form>
                         </td>
                     {% else %}
                         <td><strong>{{ h.linkedin_handle }}</strong></td>
                         <td>{{ h.display_name or '—' }}</td>
+                        <td class="tags-cell">
+                            {% if h.tags %}
+                                {% for t in h.tags %}
+                                    <span class="tag-chip tag-dim-{{ t.dimension }}" title="{{ t.dimension }}">{{ t.label }}</span>
+                                {% endfor %}
+                            {% else %}—{% endif %}
+                        </td>
                         <td>{{ h.notes or '—' }}</td>
                         <td class="{% if h.is_stale %}stale{% endif %}">{{ h.last_fetched_display }}</td>
+                        <td>{{ h.last_posted_display }}</td>
                         <td class="metric">{{ h.posts_count if h.posts_count else '—' }}</td>
                         <td class="metric">
                             {% if h.avg_rating is not none %}
@@ -89,20 +217,23 @@
                             {% else %}—{% endif %}
                         </td>
                         <td>
-                            <button hx-post="/admin/handles/{{ h.id }}/toggle"
-                                    hx-target="#admin-main" hx-swap="outerHTML"
-                                    class="toggle {% if h.active %}on{% else %}off{% endif %}">
-                                {{ "On" if h.active else "Off" }}
-                            </button>
+                            <form hx-post="/admin/handles/{{ h.id }}/toggle" hx-target="#admin-main" hx-swap="outerHTML" style="display:inline;">
+                                <input type="hidden" name="selected_tags" value="{{ selected_tags_param }}">
+                                <button type="submit" class="toggle {% if h.active %}on{% else %}off{% endif %}">
+                                    {{ "On" if h.active else "Off" }}
+                                </button>
+                            </form>
                         </td>
                         <td class="actions">
-                            <button hx-get="/admin/handles/{{ h.id }}/edit"
+                            <button hx-get="/admin/handles/{{ h.id }}/edit{% if selected_tags %}?tags={{ selected_tags_param }}{% endif %}"
                                     hx-target="#admin-main" hx-swap="outerHTML"
                                     class="edit">Edit</button>
-                            <button hx-post="/admin/handles/{{ h.id }}/delete"
-                                    hx-target="#admin-main" hx-swap="outerHTML"
-                                    hx-confirm="Delete '{{ h.linkedin_handle }}'? Posts and history will be preserved."
-                                    class="delete">Delete</button>
+                            <form hx-post="/admin/handles/{{ h.id }}/delete" hx-target="#admin-main" hx-swap="outerHTML"
+                                  hx-confirm="Delete '{{ h.linkedin_handle }}'? Posts and history will be preserved."
+                                  style="display:inline;">
+                                <input type="hidden" name="selected_tags" value="{{ selected_tags_param }}">
+                                <button type="submit" class="delete">Delete</button>
+                            </form>
                         </td>
                     {% endif %}
                 </tr>

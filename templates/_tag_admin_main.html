@@ -1,0 +1,82 @@
+<div id="tag-admin-main">
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+    {% if flash %}<div class="alert alert-success">{{ flash }}</div>{% endif %}
+
+    <section class="tags-intro">
+        <h2>Tags</h2>
+        <p class="muted">
+            Organise handles across four dimensions. Tags are shown as chips on the
+            <a href="/admin">Handles page</a> and can be used to filter the list.
+        </p>
+    </section>
+
+    <section class="add-form">
+        <h2>Add a tag</h2>
+        <form hx-post="/admin/tags" hx-target="#tag-admin-main" hx-swap="outerHTML" autocomplete="off">
+            <select name="dimension" required>
+                {% for d in dimensions %}
+                <option value="{{ d }}">{{ dimension_labels[d] }}</option>
+                {% endfor %}
+            </select>
+            <input type="text" name="label" placeholder="Label (e.g. 'Marketing — B2B')" required>
+            <input type="text" name="description" placeholder="Description (optional)">
+            <input type="number" name="sort_order" value="0" title="Sort order (lower = first)" style="max-width: 90px;">
+            <button type="submit">Add</button>
+        </form>
+        <p class="muted small">Slug is auto-derived from the label (lowercased, hyphenated).</p>
+    </section>
+
+    {% for d in dimensions %}
+    <section class="tags-dimension">
+        <h2>{{ dimension_labels[d] }} <span class="muted">({{ grouped[d]|length }})</span></h2>
+        {% if not grouped[d] %}
+        <p class="empty">No tags in this dimension yet.</p>
+        {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Tag</th>
+                    <th>Slug</th>
+                    <th>Description</th>
+                    <th title="Sort order — lower numbers appear first">Order</th>
+                    <th title="Handles using this tag">Used by</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in grouped[d] %}
+                <tr>
+                    {% if edit_id == t.id %}
+                        <td colspan="6">
+                            <form class="edit-form" hx-post="/admin/tags/{{ t.id }}/edit" hx-target="#tag-admin-main" hx-swap="outerHTML">
+                                <input type="text" name="label" value="{{ t.label }}" required>
+                                <input type="text" name="description" value="{{ t.description or '' }}" placeholder="Description">
+                                <input type="number" name="sort_order" value="{{ t.sort_order }}" style="max-width: 90px;">
+                                <button type="submit">Save</button>
+                                <a href="/admin/tags">Cancel</a>
+                            </form>
+                        </td>
+                    {% else %}
+                        <td><span class="tag-chip tag-dim-{{ t.dimension }}">{{ t.label }}</span></td>
+                        <td><code class="tag-slug">{{ t.slug }}</code></td>
+                        <td>{{ t.description or '—' }}</td>
+                        <td class="metric">{{ t.sort_order }}</td>
+                        <td class="metric">{{ t.handle_count if t.handle_count else '—' }}</td>
+                        <td class="actions">
+                            <button hx-get="/admin/tags/{{ t.id }}/edit"
+                                    hx-target="#tag-admin-main" hx-swap="outerHTML"
+                                    class="edit">Edit</button>
+                            <button hx-post="/admin/tags/{{ t.id }}/delete"
+                                    hx-target="#tag-admin-main" hx-swap="outerHTML"
+                                    hx-confirm="Delete tag '{{ t.label }}'? It will be removed from all {{ t.handle_count }} handle(s) using it."
+                                    class="delete">Delete</button>
+                        </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </section>
+    {% endfor %}
+</div>

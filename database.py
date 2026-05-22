@@ -58,7 +58,62 @@ CREATE TABLE IF NOT EXISTS fetch_runs (
     error_count INTEGER DEFAULT 0,
     summary_json TEXT
 );
+
+CREATE TABLE IF NOT EXISTS tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT UNIQUE NOT NULL,
+    label TEXT NOT NULL,
+    dimension TEXT NOT NULL CHECK(dimension IN ('persona','reach','intent','cadence')),
+    description TEXT,
+    sort_order INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    deleted_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS handle_tags (
+    handle_id INTEGER NOT NULL REFERENCES handles(id) ON DELETE CASCADE,
+    tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (handle_id, tag_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_handle_tags_tag ON handle_tags(tag_id);
 """
+
+# (slug, label, dimension, description, sort_order)
+SEED_TAGS = [
+    # Persona — what hat they wear in their posts
+    ("founder", "Founder", "persona", "Posts from a founder lens", 10),
+    ("ceo", "CEO", "persona", "C-suite leadership perspective", 20),
+    ("exec", "Exec / VP", "persona", "Senior leader, not founder", 30),
+    ("operator", "Operator", "persona", "Director/manager-level, in-the-weeds", 40),
+    ("product", "Product", "persona", "Product management voice", 50),
+    ("engineering", "Engineering", "persona", "Eng leader or builder", 60),
+    ("design", "Design", "persona", "Design leader or practitioner", 70),
+    ("marketing", "Marketing", "persona", "Marketing / growth leader", 80),
+    ("sales", "Sales", "persona", "Sales leader or rep", 90),
+    ("recruiter", "Recruiter", "persona", "External or in-house recruiter", 100),
+    ("investor-vc", "Investor — VC", "persona", "Venture capital", 110),
+    ("investor-pe", "Investor — PE", "persona", "Private equity", 120),
+    ("creator", "Creator", "persona", "LinkedIn content as their main thing", 130),
+    ("coach", "Coach", "persona", "Executive or career coach", 140),
+    ("analyst", "Analyst", "persona", "Industry / research analyst", 150),
+    # Reach — audience size
+    ("reach-mega", "Mega (100k+)", "reach", "Mega audience, 100k+ followers", 10),
+    ("reach-large", "Large (10–100k)", "reach", "Large audience, 10k–100k followers", 20),
+    ("reach-mid", "Mid (1–10k)", "reach", "Mid audience, 1k–10k followers", 30),
+    ("reach-niche", "Niche (<1k)", "reach", "Small but often high-conversion audience", 40),
+    # Intent — why they're on your list
+    ("prospect", "Prospect", "intent", "Potential customer / buyer", 10),
+    ("network", "Network", "intent", "Peer relationship", 20),
+    ("hiring-signal", "Hiring signal", "intent", "Recruiters or hiring managers", 30),
+    ("thought-leader", "Thought leader", "intent", "You learn from them", 40),
+    ("industry-watch", "Industry watch", "intent", "Vertical pulse / trend signal", 50),
+    # Cadence — posting frequency
+    ("cadence-daily", "Daily", "cadence", "Posts daily", 10),
+    ("cadence-weekly", "Weekly", "cadence", "Posts roughly weekly", 20),
+    ("cadence-sporadic", "Sporadic", "cadence", "Posts occasionally", 30),
+]
 
 
 def db_path() -> str:
@@ -70,6 +125,10 @@ async def _migrate(db: aiosqlite.Connection) -> None:
     cols = [r[1] for r in await cur.fetchall()]
     if "deleted_at" not in cols:
         await db.execute("ALTER TABLE handles ADD COLUMN deleted_at TEXT")
+    if "enrichment_json" not in cols:
+        await db.execute("ALTER TABLE handles ADD COLUMN enrichment_json TEXT")
+    if "enriched_at" not in cols:
+        await db.execute("ALTER TABLE handles ADD COLUMN enriched_at TEXT")
 
     cur = await db.execute("PRAGMA table_info(posted_log)")
     cols = [r[1] for r in await cur.fetchall()]
@@ -79,10 +138,21 @@ async def _migrate(db: aiosqlite.Connection) -> None:
         await db.execute("ALTER TABLE posted_log ADD COLUMN rated_at TEXT")
 
 
+async def _seed_tags(db: aiosqlite.Connection) -> None:
+    await db.executemany(
+        """
+        INSERT OR IGNORE INTO tags (slug, label, dimension, description, sort_order)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        SEED_TAGS,
+    )
+
+
 async def init_db() -> None:
     async with aiosqlite.connect(db_path()) as db:
         await db.executescript(SCHEMA)
         await _migrate(db)
+        await _seed_tags(db)
         await db.commit()
 
 
