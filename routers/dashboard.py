@@ -239,7 +239,8 @@ async def _set_status_if(post_id: int, new_status: str, only_from: Optional[set]
 
 @router.get("", response_class=HTMLResponse)
 async def dashboard(request: Request, status: str = "unreviewed"):
-    return await _render_dashboard(request, full_page=True, status=status)
+    is_htmx = request.headers.get("hx-request") == "true"
+    return await _render_dashboard(request, full_page=not is_htmx, status=status)
 
 
 @router.post("/posts/{post_id}/dismiss", response_class=HTMLResponse)
