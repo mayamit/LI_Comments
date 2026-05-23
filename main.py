@@ -16,6 +16,7 @@ from database import init_db
 from routers import admin
 from routers import dashboard
 from routers import history
+from routers import image_proxy
 from routers import posted
 from routers import tag_admin
 from routers import tones as tones_router
@@ -85,6 +86,7 @@ app.include_router(tones_router.router)
 app.include_router(dashboard.router)
 app.include_router(history.router)
 app.include_router(posted.router)
+app.include_router(image_proxy.router)
 
 
 @app.get("/")
