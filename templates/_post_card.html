@@ -41,6 +41,17 @@
             {% if e.comments is not none %}<span>💬 {{ e.comments }}</span>{% endif %}
             {% if e.reposts is not none %}<span>↻ {{ e.reposts }}</span>{% endif %}
         </div>
+        {% if p.images %}
+        <div class="post-images {% if p.images|length > 1 %}post-images-grid{% endif %}">
+            {% for img in p.images %}
+            <a href="{{ img.url }}" target="_blank" rel="noopener">
+                <img src="{{ img.url }}" alt="Post image"
+                     loading="lazy"
+                     onerror="this.closest('a').style.display='none'">
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
         <div class="post-full">{{ p.full_content or '(no post content)' }}</div>
     </section>
 

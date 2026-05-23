@@ -37,6 +37,27 @@ def _parse_engagement(raw: Optional[str]) -> dict:
     }
 
 
+def _parse_images(raw: Optional[str]) -> list[dict]:
+    """Pull post image URLs out of the stored Apify response."""
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    item = data.get("raw") or {}
+    imgs = item.get("postImages") or []
+    out = []
+    for img in imgs:
+        if isinstance(img, dict):
+            url = img.get("url")
+            if isinstance(url, str) and url.startswith("http"):
+                out.append(
+                    {"url": url, "width": img.get("width"), "height": img.get("height")}
+                )
+    return out
+
+
 async def _fetch_status_counts() -> dict:
     async with get_db() as db:
         cur = await db.execute("SELECT status, COUNT(*) AS c FROM posts GROUP BY status")
@@ -109,6 +130,7 @@ async def _fetch_posts(status: str) -> list[dict]:
     posts = []
     for r in post_rows:
         engagement = _parse_engagement(r["engagement_json"])
+        images = _parse_images(r["engagement_json"])
         time_iso = r["posted_at"] or r["fetched_at"]
         posted_tone = posted_tones.get(r["id"])
         # Render the 6 tones in canonical order; mark missing ones explicitly.
@@ -134,6 +156,7 @@ async def _fetch_posts(status: str) -> list[dict]:
                 "full_content": r["content"],
                 "url": r["url"],
                 "engagement": engagement,
+                "images": images,
                 "time_iso": time_iso,
                 "time_display": relative_time(time_iso),
                 "status": r["status"],
