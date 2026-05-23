@@ -479,3 +479,52 @@ async def toggle_handle(request: Request, handle_id: int, selected_tags: str = F
         )
         await db.commit()
     return await _render(request, full_page=False, selected_tags=sel)
+
+
+@router.post("/handles/deactivate-all", response_class=HTMLResponse)
+async def deactivate_all(request: Request, selected_tags: str = Form("")):
+    sel = _parse_tag_param(selected_tags)
+    async with get_db() as db:
+        cur = await db.execute(
+            "UPDATE handles SET active = 0 WHERE active = 1 AND deleted_at IS NULL"
+        )
+        count = cur.rowcount
+        await db.commit()
+    msg = (
+        f"Deactivated {count} handle(s)."
+        if count
+        else "Nothing to do — no active handles."
+    )
+    return await _render(request, full_page=False, flash=msg, selected_tags=sel)
+
+
+@router.post("/handles/activate-recommended", response_class=HTMLResponse)
+async def activate_recommended(
+    request: Request,
+    handle_ids: str = Form(""),
+    selected_tags: str = Form(""),
+):
+    sel = _parse_tag_param(selected_tags)
+    ids = [int(s) for s in handle_ids.split(",") if s.strip().isdigit()]
+    if not ids:
+        return await _render(
+            request,
+            full_page=False,
+            error="No recommended handles to activate.",
+            selected_tags=sel,
+        )
+    placeholders = ",".join("?" * len(ids))
+    async with get_db() as db:
+        cur = await db.execute(
+            f"UPDATE handles SET active = 1 "
+            f"WHERE id IN ({placeholders}) AND active = 0 AND deleted_at IS NULL",
+            ids,
+        )
+        count = cur.rowcount
+        await db.commit()
+    return await _render(
+        request,
+        full_page=False,
+        flash=f"Activated {count} recommended handle(s).",
+        selected_tags=sel,
+    )

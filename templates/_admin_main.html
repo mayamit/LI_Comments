@@ -24,6 +24,14 @@
                         title="For handles with no tags yet: fetch profile data, set reach/cadence/persona tags, refresh display names">Auto-tag untagged</button>
             </form>
             <span id="autotag-spinner" class="htmx-indicator">Enriching… (this takes ~30s per handle)</span>
+            <form hx-post="/admin/handles/deactivate-all" hx-target="#admin-main" hx-swap="outerHTML"
+                  hx-confirm="Deactivate ALL active handles? They will be excluded from the daily 6am fetch until you re-activate them."
+                  style="display:inline; margin-left: 0.5rem;">
+                <input type="hidden" name="selected_tags" value="{{ selected_tags_param }}">
+                <button type="submit"
+                        class="btn-danger"
+                        title="Set every active handle to inactive (preserves tags, notes, history)">Deactivate all</button>
+            </form>
         </div>
         {% if last_run %}
         <div class="last-run">
@@ -50,8 +58,29 @@
     </section>
 
     {% if recommendations %}
+    {% set rec_ids = recommendations | map(attribute='id') | join(',') %}
     <details class="recommendations" open>
-        <summary><h2 style="display:inline; margin: 0;">Recommended to activate ({{ recommendations|length }})</h2></summary>
+        <summary>
+            <h2 style="display:inline; margin: 0;">Recommended to activate ({{ recommendations|length }})</h2>
+            <a hx-get="/admin{% if selected_tags %}?tags={{ selected_tags_param }}{% endif %}"
+               hx-target="#admin-main" hx-swap="outerHTML"
+               hx-indicator="#rec-refresh-spinner"
+               href="javascript:void(0)"
+               onclick="event.preventDefault(); event.stopPropagation();"
+               class="rec-refresh-link"
+               title="Recompute scores from current data">↻ Refresh</a>
+            <span id="rec-refresh-spinner" class="htmx-indicator inline-spinner">…</span>
+            <form hx-post="/admin/handles/activate-recommended"
+                  hx-target="#admin-main" hx-swap="outerHTML"
+                  hx-confirm="Activate all {{ recommendations|length }} recommended handle(s)?"
+                  onclick="event.stopPropagation();"
+                  style="display:inline; margin: 0;">
+                <input type="hidden" name="handle_ids" value="{{ rec_ids }}">
+                <input type="hidden" name="selected_tags" value="{{ selected_tags_param }}">
+                <button type="submit" class="btn-small rec-activate"
+                        title="Activate all handles currently shown in this panel">Activate all</button>
+            </form>
+        </summary>
         <p class="muted small" style="margin: 0.3rem 0 0.5rem;">
             Score combines engagement (posts, ratings), your-care (notes, display name), tags
             (intent, reach, persona, cadence), and a recency penalty if you posted recently —
