@@ -149,6 +149,18 @@ def _is_stale(iso: Optional[str]) -> bool:
     return (datetime.now(timezone.utc) - dt).total_seconds() > 86_400
 
 
+def _parse_iso(iso: Optional[str]) -> Optional[datetime]:
+    if not iso:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 async def _fetch_all_tags_grouped(db):
     """Return all active tags grouped by dimension, sorted within each."""
     cur = await db.execute(
@@ -174,8 +186,13 @@ async def _fetch_all_tags_grouped(db):
     return grouped
 
 
-async def _fetch_handles(selected_tag_slugs: Optional[List[str]] = None):
+async def _fetch_handles(
+    selected_tag_slugs: Optional[List[str]] = None,
+    last_run_started_at: Optional[str] = None,
+):
     selected_tag_slugs = selected_tag_slugs or []
+    run_started_dt = _parse_iso(last_run_started_at)
+    now = datetime.now(timezone.utc)
     async with get_db() as db:
         where = ["h.deleted_at IS NULL"]
         params: list = []
@@ -241,6 +258,16 @@ async def _fetch_handles(selected_tag_slugs: Optional[List[str]] = None):
             }
         )
 
+    def _freshness(iso: Optional[str]) -> str:
+        dt = _parse_iso(iso)
+        if dt is None:
+            return "none"
+        if run_started_dt is not None and dt >= run_started_dt:
+            return "this-run"
+        if (now - dt).total_seconds() <= 86_400:
+            return "recent"
+        return "stale"
+
     return [
         {
             "id": r["id"],
@@ -251,6 +278,7 @@ async def _fetch_handles(selected_tag_slugs: Optional[List[str]] = None):
             "last_fetched_at": r["last_fetched_at"],
             "last_fetched_display": _relative_time(r["last_fetched_at"]),
             "is_stale": _is_stale(r["last_fetched_at"]),
+            "freshness": _freshness(r["last_fetched_at"]),
             "posts_count": r["posts_count"] or 0,
             "avg_rating": round(r["avg_rating"], 1) if r["avg_rating"] is not None else None,
             "rated_count": r["rated_count"] or 0,
@@ -273,13 +301,16 @@ async def _render(
     selected_tags: Optional[List[str]] = None,
 ):
     selected_tags = selected_tags or []
-    handles = await _fetch_handles(selected_tags)
+    last_run = await get_last_run()
+    last_run_started = last_run["started_at"] if last_run else None
+    handles = await _fetch_handles(selected_tags, last_run_started)
     # Recommendations are computed across all handles, ignoring the table filter.
-    all_handles = handles if not selected_tags else await _fetch_handles([])
+    all_handles = (
+        handles if not selected_tags else await _fetch_handles([], last_run_started)
+    )
     recommendations = _recommendations(all_handles)
     async with get_db() as db:
         all_tags_grouped = await _fetch_all_tags_grouped(db)
-    last_run = await get_last_run()
     if last_run:
         last_run["started_display"] = _relative_time(last_run["started_at"])
     ctx = {

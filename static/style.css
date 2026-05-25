@@ -97,7 +97,14 @@ th, td {
 }
 th { background: var(--bg-soft); font-weight: 600; font-size: 0.85rem; color: #555; }
 
+tr.handle-row.freshness-this-run { background: #e8f5e9; }
+tr.handle-row.freshness-this-run td:first-child { box-shadow: inset 3px 0 0 #2e7d32; }
+tr.handle-row.freshness-recent { background: #f1f8e9; }
+tr.handle-row.freshness-recent td:first-child { box-shadow: inset 3px 0 0 #9ccc65; }
+
 tr.handle-row.inactive { color: var(--muted); background: #fafafa; }
+tr.handle-row.inactive.freshness-this-run { background: #eef5ee; }
+tr.handle-row.inactive.freshness-recent { background: #f4f7ef; }
 tr.handle-row.inactive strong { color: var(--muted); }
 
 td.stale { color: var(--warn); font-weight: 500; }
