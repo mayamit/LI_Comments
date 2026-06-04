@@ -2,17 +2,19 @@ import logging
 import os
 import shutil
 import sys
+import time
 from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from agent import run_fetch
 from database import init_db
+from logging_setup import install_asyncio_exception_handler, setup_logging
 from routers import admin
 from routers import dashboard
 from routers import history
@@ -22,12 +24,7 @@ from routers import tag_admin
 from routers import tones as tones_router
 
 load_dotenv()
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
-# httpx logs full request URLs at INFO, which leaks the APIFY_TOKEN query param.
-logging.getLogger("httpx").setLevel(logging.WARNING)
+setup_logging()
 
 REQUIRED_ENV = ["APIFY_TOKEN"]
 
@@ -53,6 +50,7 @@ def check_env() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     check_env()
+    install_asyncio_exception_handler()
     await init_db()
     scheduler = AsyncIOScheduler()
     schedule_enabled = os.getenv("FETCH_SCHEDULE_ENABLED", "0").lower() in (
@@ -91,6 +89,40 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="LI_Comments", lifespan=lifespan)
+
+_request_log = logging.getLogger("request")
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log every request with status + duration so hangs, slow runs (e.g. a
+    long 'Run Now'), and 5xx errors are visible on disk after the fact."""
+    start = time.monotonic()
+    try:
+        response = await call_next(request)
+    except Exception:
+        dur_ms = (time.monotonic() - start) * 1000
+        _request_log.exception(
+            "%s %s -> unhandled exception after %.0fms",
+            request.method,
+            request.url.path,
+            dur_ms,
+        )
+        raise
+    dur_ms = (time.monotonic() - start) * 1000
+    level = logging.INFO
+    if response.status_code >= 500 or dur_ms > 1000:
+        level = logging.WARNING
+    _request_log.log(
+        level,
+        "%s %s -> %d (%.0fms)",
+        request.method,
+        request.url.path,
+        response.status_code,
+        dur_ms,
+    )
+    return response
+
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(admin.router)

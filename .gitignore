@@ -12,3 +12,6 @@ venv/
 # Personal voice references — kept local, baked into tones.yaml
 voice-profile-amit-gandhi.md
 linkedin-voice-check-checklist*.md
+
+# Runtime logs
+logs/
