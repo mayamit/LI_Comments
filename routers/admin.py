@@ -220,7 +220,7 @@ async def _fetch_handles(
         cur = await db.execute(
             f"""
             SELECT h.id, h.linkedin_handle, h.display_name, h.active, h.notes,
-                   h.last_fetched_at,
+                   h.last_fetched_at, h.created_at,
                    COUNT(pl.id) AS posts_count,
                    AVG(pl.rating) AS avg_rating,
                    COUNT(pl.rating) AS rated_count,
@@ -268,6 +268,12 @@ async def _fetch_handles(
             return "recent"
         return "stale"
 
+    def _is_new(iso: Optional[str]) -> bool:
+        dt = _parse_iso(iso)
+        if dt is None:
+            return False
+        return (now - dt).total_seconds() <= 86_400
+
     return [
         {
             "id": r["id"],
@@ -279,6 +285,8 @@ async def _fetch_handles(
             "last_fetched_display": _relative_time(r["last_fetched_at"]),
             "is_stale": _is_stale(r["last_fetched_at"]),
             "freshness": _freshness(r["last_fetched_at"]),
+            "created_at": r["created_at"],
+            "is_new": _is_new(r["created_at"]),
             "posts_count": r["posts_count"] or 0,
             "avg_rating": round(r["avg_rating"], 1) if r["avg_rating"] is not None else None,
             "rated_count": r["rated_count"] or 0,

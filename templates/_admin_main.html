@@ -165,7 +165,17 @@
     </section>
 
     <section class="handles-list">
-        <h2>Handles ({{ handles|length }}{% if selected_tags %} filtered{% endif %})</h2>
+        {% set active_count = handles | selectattr('active') | list | length %}
+        {% set new_count = handles | selectattr('is_new') | list | length %}
+        <div class="handles-header">
+            <h2>Handles ({{ handles|length }}{% if selected_tags %} filtered{% endif %}
+                — <span class="active-count">{{ active_count }} active</span>{% if new_count %},
+                <span class="new-count">{{ new_count }} new ≤24h</span>{% endif %})</h2>
+            <button type="button" id="active-only-toggle" class="btn-small"
+                    title="Hide inactive handles">Show active only</button>
+            <button type="button" id="recent-only-toggle" class="btn-small"
+                    title="Hide handles added more than 24 hours ago">Show new (≤24h)</button>
+        </div>
         {% if not handles %}
             <p class="empty">
                 {% if selected_tags %}
@@ -192,7 +202,7 @@
             </thead>
             <tbody>
                 {% for h in handles %}
-                <tr class="handle-row freshness-{{ h.freshness }} {% if not h.active %}inactive{% endif %}">
+                <tr class="handle-row freshness-{{ h.freshness }} {% if not h.active %}inactive{% endif %} {% if h.is_new %}recently-added{% endif %}">
                     {% if edit_id == h.id %}
                         <td>{{ h.linkedin_handle }}</td>
                         <td colspan="9">
@@ -271,4 +281,29 @@
         </table>
         {% endif %}
     </section>
+    <script>
+    (function () {
+        var list = document.querySelector('.handles-list');
+        if (!list) return;
+        function bindToggle(btnId, listClass, storageKey, onLabel, offLabel) {
+            var btn = document.getElementById(btnId);
+            if (!btn) return;
+            function apply(on) {
+                list.classList.toggle(listClass, on);
+                btn.textContent = on ? onLabel : offLabel;
+                btn.classList.toggle('on', on);
+            }
+            apply(localStorage.getItem(storageKey) === '1');
+            btn.addEventListener('click', function () {
+                var on = !list.classList.contains(listClass);
+                localStorage.setItem(storageKey, on ? '1' : '0');
+                apply(on);
+            });
+        }
+        bindToggle('active-only-toggle', 'active-only', 'handles-active-only',
+                   'Show all', 'Show active only');
+        bindToggle('recent-only-toggle', 'recent-only', 'handles-recent-only',
+                   'Show all (clear ≤24h)', 'Show new (≤24h)');
+    })();
+    </script>
 </div>

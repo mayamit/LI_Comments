@@ -107,6 +107,15 @@ tr.handle-row.inactive.freshness-this-run { background: #eef5ee; }
 tr.handle-row.inactive.freshness-recent { background: #f4f7ef; }
 tr.handle-row.inactive strong { color: var(--muted); }
 
+.handles-header { display: flex; align-items: baseline; gap: 0.75rem; }
+.handles-header h2 { margin-right: auto; }
+.handles-header .active-count { color: #2e7d32; font-weight: 600; }
+.handles-header .new-count { color: #1565c0; font-weight: 600; }
+#active-only-toggle.on { background: #2e7d32; color: #fff; border-color: #2e7d32; }
+#recent-only-toggle.on { background: #1565c0; color: #fff; border-color: #1565c0; }
+.handles-list.active-only tr.handle-row.inactive { display: none; }
+.handles-list.recent-only tr.handle-row:not(.recently-added) { display: none; }
+
 td.stale { color: var(--warn); font-weight: 500; }
 
 .actions { white-space: nowrap; }
