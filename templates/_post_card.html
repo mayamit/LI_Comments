@@ -1,5 +1,10 @@
 {# Vars: p (post), active_status #}
-<article class="post-card status-{{ p.status }}" id="post-{{ p.id }}">
+<article class="post-card status-{{ p.status }} {% if p.already_posted %}already-posted{% endif %}" id="post-{{ p.id }}">
+    {% if p.already_posted %}
+    <div class="already-posted-banner" title="You already logged a posted comment for this post in posted_log">
+        ✓ You already posted a comment on this post{% if p.posted_tone_name %} ({{ p.posted_tone_name }} tone){% endif %}.
+    </div>
+    {% endif %}
     <header class="post-header">
         <div class="post-author">
             <strong>{{ p.display_name }}</strong>

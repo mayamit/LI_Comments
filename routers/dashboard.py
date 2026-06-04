@@ -126,6 +126,7 @@ async def _fetch_posts(status: str) -> list[dict]:
 
     posted_tones = await _fetch_posted_tones(post_ids)
     tones = tones_store.get_all()
+    tone_names = {t["key"]: t["name"] for t in tones}
 
     posts = []
     for r in post_rows:
@@ -164,6 +165,8 @@ async def _fetch_posts(status: str) -> list[dict]:
                 "comment_count": sum(1 for b in tone_blocks if b["comment"]),
                 "can_regenerate": r["status"] != "posted",
                 "is_posted_status": r["status"] == "posted",
+                "already_posted": posted_tone is not None,
+                "posted_tone_name": tone_names.get(posted_tone) if posted_tone else None,
             }
         )
     return posts

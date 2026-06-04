@@ -289,6 +289,16 @@ button[disabled] { opacity: 0.6; cursor: progress; }
 .post-card.status-reviewed { border-left: 3px solid var(--success); }
 .post-card.status-posted { border-left: 3px solid var(--primary); opacity: 0.85; }
 .post-card.status-dismissed { opacity: 0.6; }
+.post-card.already-posted { border-left: 3px solid var(--primary); background: #f5f9ff; }
+.already-posted-banner {
+    background: #e3edf9;
+    color: var(--primary);
+    border-radius: 4px;
+    padding: 0.45rem 0.7rem;
+    margin: -0.3rem -0.3rem 0.7rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
 
 .post-header {
     display: flex;
