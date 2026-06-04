@@ -55,21 +55,34 @@ async def lifespan(app: FastAPI):
     check_env()
     await init_db()
     scheduler = AsyncIOScheduler()
-    hour = int(os.getenv("FETCH_SCHEDULE_HOUR", "6"))
-    minute = int(os.getenv("FETCH_SCHEDULE_MINUTE", "0"))
-    scheduler.add_job(
-        run_fetch,
-        CronTrigger(hour=hour, minute=minute),
-        kwargs={"trigger": "scheduled"},
-        id="daily_fetch",
-        max_instances=1,
-        coalesce=True,
-        replace_existing=True,
+    schedule_enabled = os.getenv("FETCH_SCHEDULE_ENABLED", "0").lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
     )
-    scheduler.start()
-    logging.getLogger(__name__).info(
-        "Scheduler started — daily fetch at %02d:%02d", hour, minute
-    )
+    if schedule_enabled:
+        hour = int(os.getenv("FETCH_SCHEDULE_HOUR", "6"))
+        minute = int(os.getenv("FETCH_SCHEDULE_MINUTE", "0"))
+        scheduler.add_job(
+            run_fetch,
+            CronTrigger(hour=hour, minute=minute),
+            kwargs={"trigger": "scheduled"},
+            id="daily_fetch",
+            max_instances=1,
+            coalesce=True,
+            replace_existing=True,
+        )
+        scheduler.start()
+        logging.getLogger(__name__).info(
+            "Scheduler started — daily fetch at %02d:%02d", hour, minute
+        )
+    else:
+        scheduler.start()
+        logging.getLogger(__name__).info(
+            "Scheduler started — automatic daily fetch disabled "
+            "(set FETCH_SCHEDULE_ENABLED=1 to enable); use 'Run Now' to fetch"
+        )
     app.state.scheduler = scheduler
     try:
         yield
