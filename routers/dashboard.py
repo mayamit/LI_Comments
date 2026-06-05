@@ -93,7 +93,7 @@ async def _fetch_posts(status: str) -> list[dict]:
     async with get_db() as db:
         cur = await db.execute(
             f"""
-            SELECT p.id, p.post_id, p.content, p.url, p.engagement_json,
+            SELECT p.id, p.post_id, p.content, p.summary, p.url, p.engagement_json,
                    p.posted_at, p.fetched_at, p.status,
                    h.linkedin_handle, h.display_name, h.deleted_at AS handle_deleted_at
             FROM posts p JOIN handles h ON p.handle_id = h.id
@@ -155,6 +155,7 @@ async def _fetch_posts(status: str) -> list[dict]:
                 "handle_deleted": r["handle_deleted_at"] is not None,
                 "preview": truncate(r["content"], 300),
                 "full_content": r["content"],
+                "summary": r["summary"],
                 "url": r["url"],
                 "engagement": engagement,
                 "images": images,

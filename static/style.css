@@ -385,6 +385,28 @@ button[disabled] { opacity: 0.6; cursor: progress; }
     border-left: 3px solid var(--border);
 }
 
+.post-summary {
+    background: #eef5fd;
+    border-left: 3px solid var(--primary);
+    border-radius: 6px;
+    padding: 0.7rem 1rem;
+    margin-bottom: 0.7rem;
+}
+.post-summary-label {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--primary);
+    margin-bottom: 0.3rem;
+}
+.post-summary p {
+    margin: 0;
+    line-height: 1.55;
+    font-size: 0.94rem;
+}
+
 .post-images {
     display: flex;
     flex-direction: column;
