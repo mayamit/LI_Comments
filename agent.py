@@ -255,7 +255,8 @@ async def run_fetch(trigger: str = "manual") -> dict:
 
 
 async def _run_fetch_inner(trigger: str) -> dict:
-    from comments import generate_for_post  # local import avoids circulars at boot
+    # local imports avoid circulars at boot
+    from comments import generate_for_post, generate_summary_for_post
 
     started_at = await _now_iso()
     summary = {
@@ -265,6 +266,7 @@ async def _run_fetch_inner(trigger: str) -> dict:
         "new_posts": 0,
         "skipped_duplicates": 0,
         "comments_generated": 0,
+        "summaries_generated": 0,
         "errors": [],
     }
 
@@ -298,6 +300,14 @@ async def _run_fetch_inner(trigger: str) -> dict:
             new_db_id = await _insert_post_if_new(h["id"], post_id, item)
             if new_db_id is not None:
                 summary["new_posts"] += 1
+                try:
+                    if await generate_summary_for_post(new_db_id):
+                        summary["summaries_generated"] += 1
+                except Exception as e:
+                    logger.exception("Summary generation failed for post %d", new_db_id)
+                    summary["errors"].append(
+                        {"handle": handle_name, "error": f"summary generation: {e}"}
+                    )
                 try:
                     gen = await generate_for_post(new_db_id)
                     summary["comments_generated"] += gen["generated"]
@@ -335,6 +345,7 @@ async def _run_fetch_inner(trigger: str) -> dict:
                     {
                         "errors": summary["errors"],
                         "comments_generated": summary["comments_generated"],
+                        "summaries_generated": summary["summaries_generated"],
                     }
                 ),
                 run_id,
@@ -369,4 +380,5 @@ async def get_last_run() -> Optional[dict]:
     parsed = json.loads(raw)
     d["errors"] = parsed.get("errors", [])
     d["comments_generated"] = parsed.get("comments_generated", 0)
+    d["summaries_generated"] = parsed.get("summaries_generated", 0)
     return d

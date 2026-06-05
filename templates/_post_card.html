@@ -55,6 +55,12 @@
             {% endfor %}
         </div>
         {% endif %}
+        {% if p.summary %}
+        <div class="post-summary">
+            <span class="post-summary-label">TL;DR</span>
+            <p>{{ p.summary }}</p>
+        </div>
+        {% endif %}
         <div class="post-full">{{ p.full_content or '(no post content)' }}</div>
     </section>
 

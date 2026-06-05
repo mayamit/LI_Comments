@@ -44,15 +44,12 @@ def _build_prompt(
     )
 
 
-async def _generate_one(
-    shared_prompt: str,
-    tone: dict,
-    display_name: Optional[str],
-    handle: str,
-    post_content: Optional[str],
-) -> Optional[str]:
-    """Call the Claude CLI once. Returns the comment text or None for SKIP/empty."""
-    prompt = _build_prompt(shared_prompt, tone, display_name, handle, post_content)
+async def _call_claude(prompt: str, label: str) -> str:
+    """Run the Claude CLI once and return the stripped stdout text.
+
+    Raises RuntimeError on timeout or non-zero exit. `label` is only used to
+    make error messages legible (e.g. "tone 'curious'" or "summary").
+    """
     timeout = _timeout_s()
 
     # Run from a neutral cwd so the CLI does not load this project's CLAUDE.md
@@ -74,22 +71,52 @@ async def _generate_one(
     except asyncio.TimeoutError:
         proc.kill()
         await proc.wait()
-        raise RuntimeError(
-            f"claude CLI timed out after {timeout}s for tone '{tone['key']}'"
-        )
+        raise RuntimeError(f"claude CLI timed out after {timeout}s for {label}")
 
     if proc.returncode != 0:
         err = stderr.decode("utf-8", errors="replace").strip()
         raise RuntimeError(
-            f"claude CLI exited with code {proc.returncode} for tone '{tone['key']}': {err}"
+            f"claude CLI exited with code {proc.returncode} for {label}: {err}"
         )
 
     text = stdout.decode("utf-8", errors="replace").strip()
     if text.startswith('"') and text.endswith('"') and len(text) > 1:
         text = text[1:-1].strip()
+    return text
+
+
+async def _generate_one(
+    shared_prompt: str,
+    tone: dict,
+    display_name: Optional[str],
+    handle: str,
+    post_content: Optional[str],
+) -> Optional[str]:
+    """Call the Claude CLI once. Returns the comment text or None for SKIP/empty."""
+    prompt = _build_prompt(shared_prompt, tone, display_name, handle, post_content)
+    text = await _call_claude(prompt, f"tone '{tone['key']}'")
     if not text or text == "SKIP":
         return None
     return text
+
+
+SUMMARY_PROMPT = (
+    "Summarize the LinkedIn post below in 2-3 plain sentences so a reader can "
+    "grasp the gist without reading the whole thing. Capture the main point and "
+    "any key takeaway. Do not add preamble, a title, hashtags, or quotation "
+    "marks — reply with only the summary.\n\n"
+    "---\n\n"
+    "Post:\n{post_content}"
+)
+
+
+async def generate_summary(post_content: Optional[str]) -> Optional[str]:
+    """Produce a short TL;DR for a post. Returns None when there's nothing to
+    summarize. Raises RuntimeError on CLI failure (callers isolate this)."""
+    if not post_content or not post_content.strip():
+        return None
+    text = await _call_claude(SUMMARY_PROMPT.format(post_content=post_content), "summary")
+    return text or None
 
 
 async def _generate_one_safe(
@@ -152,6 +179,27 @@ async def regenerate_one_tone(post_id: int, tone_key: str) -> Optional[str]:
             )
         await db.commit()
     return content
+
+
+async def generate_summary_for_post(post_id: int) -> Optional[str]:
+    """Generate and persist a TL;DR for a post. Returns the summary, or None if
+    there was nothing to summarize. Raises on CLI failure."""
+    async with get_db() as db:
+        cur = await db.execute("SELECT content FROM posts WHERE id = ?", (post_id,))
+        row = await cur.fetchone()
+    if not row:
+        raise ValueError(f"Post {post_id} not found")
+
+    summary = await generate_summary(row["content"])
+    if summary is None:
+        return None
+
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE posts SET summary = ? WHERE id = ?", (summary, post_id)
+        )
+        await db.commit()
+    return summary
 
 
 async def generate_for_post(post_id: int) -> dict:

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS posts (
     handle_id INTEGER REFERENCES handles(id),
     post_id TEXT UNIQUE NOT NULL,
     content TEXT,
+    summary TEXT,
     url TEXT,
     engagement_json TEXT,
     posted_at TEXT,
@@ -129,6 +130,11 @@ async def _migrate(db: aiosqlite.Connection) -> None:
         await db.execute("ALTER TABLE handles ADD COLUMN enrichment_json TEXT")
     if "enriched_at" not in cols:
         await db.execute("ALTER TABLE handles ADD COLUMN enriched_at TEXT")
+
+    cur = await db.execute("PRAGMA table_info(posts)")
+    cols = [r[1] for r in await cur.fetchall()]
+    if "summary" not in cols:
+        await db.execute("ALTER TABLE posts ADD COLUMN summary TEXT")
 
     cur = await db.execute("PRAGMA table_info(posted_log)")
     cols = [r[1] for r in await cur.fetchall()]
