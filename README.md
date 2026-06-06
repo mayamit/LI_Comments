@@ -7,12 +7,31 @@ See [`CLAUDE.md`](./CLAUDE.md) for architecture, schema, and conventions.
 ## Quick start
 
 ```bash
-cp .env.example .env       # then fill in ANTHROPIC_API_KEY and APIFY_TOKEN
-make install               # pip install -r requirements.txt
-make dev                   # uvicorn main:app --reload
+cp .env.example .env             # then fill in APIFY_TOKEN
+cp tones.example.yaml tones.yaml # starter voice config (personalise it below)
+make install                     # pip install -r requirements.txt
+make dev                         # uvicorn main:app --reload
 ```
 
 App runs at `http://localhost:8000`. The SQLite database auto-initialises on first start. Health check: `GET /health`.
+
+## Personalise it to your own voice
+
+The app generates comments from `tones.yaml`. `tones.example.yaml` is a working
+default, but to make it sound like *you*, fill in a voice profile and convert it:
+
+```bash
+cp voice-profile-template.md my-voice-profile.md   # then fill it in
+python voice_to_tones.py my-voice-profile.md --force
+```
+
+The converter distils your profile into the shared system prompt and a one-line
+example reply per tone, while keeping the seven-tone structure fixed. It runs
+through the same `claude` CLI used for comments, so no API key is needed. Review
+the generated `tones.yaml`, then start the app.
+
+Your `tones.yaml` and your personal profile stay local (gitignored) — only the
+template and example are tracked, so each user keeps their own voice.
 
 ## Required environment variables
 
