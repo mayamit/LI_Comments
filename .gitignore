@@ -13,5 +13,9 @@ venv/
 voice-profile-amit-gandhi.md
 linkedin-voice-check-checklist*.md
 
+# Personal tone config — each user generates their own from a voice profile.
+# Ships as tones.example.yaml; copy or run voice_to_tones.py to create yours.
+tones.yaml
+
 # Runtime logs
 logs/
