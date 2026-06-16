@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from agent import run_fetch
 from database import init_db
+from discover import run_discovery
 from logging_setup import install_asyncio_exception_handler, setup_logging
 from routers import admin
 from routers import dashboard
@@ -72,16 +73,40 @@ async def lifespan(app: FastAPI):
             coalesce=True,
             replace_existing=True,
         )
-        scheduler.start()
         logging.getLogger(__name__).info(
-            "Scheduler started — daily fetch at %02d:%02d", hour, minute
+            "Scheduler — daily fetch at %02d:%02d", hour, minute
+        )
+
+    discovery_enabled = os.getenv("DISCOVERY_SCHEDULE_ENABLED", "0").lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if discovery_enabled:
+        d_hour = int(os.getenv("DISCOVERY_SCHEDULE_HOUR", "7"))
+        d_minute = int(os.getenv("DISCOVERY_SCHEDULE_MINUTE", "0"))
+        scheduler.add_job(
+            run_discovery,
+            CronTrigger(hour=d_hour, minute=d_minute),
+            kwargs={"trigger": "scheduled"},
+            id="daily_discovery",
+            max_instances=1,
+            coalesce=True,
+            replace_existing=True,
+        )
+        logging.getLogger(__name__).info(
+            "Scheduler — daily discovery at %02d:%02d", d_hour, d_minute
+        )
+
+    scheduler.start()
+    if not schedule_enabled and not discovery_enabled:
+        logging.getLogger(__name__).info(
+            "Scheduler started — automatic fetch and discovery disabled "
+            "(set FETCH_SCHEDULE_ENABLED / DISCOVERY_SCHEDULE_ENABLED=1); use 'Run Now'"
         )
     else:
-        scheduler.start()
-        logging.getLogger(__name__).info(
-            "Scheduler started — automatic daily fetch disabled "
-            "(set FETCH_SCHEDULE_ENABLED=1 to enable); use 'Run Now' to fetch"
-        )
+        logging.getLogger(__name__).info("Scheduler started")
     app.state.scheduler = scheduler
     try:
         yield

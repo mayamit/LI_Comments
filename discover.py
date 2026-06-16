@@ -65,6 +65,40 @@ async def get_active_topics() -> list[str]:
     return [r[0] for r in rows]
 
 
+async def get_all_topics() -> list[dict]:
+    """All topics (active and inactive) for the management UI."""
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT id, query, active FROM discovery_topics ORDER BY id"
+        )
+        return [dict(r) for r in await cur.fetchall()]
+
+
+async def add_topic(query: str) -> None:
+    q = (query or "").strip()
+    if not q:
+        raise DiscoveryError("Topic cannot be empty.")
+    async with get_db() as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO discovery_topics (query) VALUES (?)", (q,)
+        )
+        await db.commit()
+
+
+async def toggle_topic(topic_id: int) -> None:
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE discovery_topics SET active = 1 - active WHERE id = ?", (topic_id,)
+        )
+        await db.commit()
+
+
+async def delete_topic(topic_id: int) -> None:
+    async with get_db() as db:
+        await db.execute("DELETE FROM discovery_topics WHERE id = ?", (topic_id,))
+        await db.commit()
+
+
 # --------------------------- actor call ---------------------------
 
 
@@ -192,28 +226,37 @@ async def _now_iso() -> str:
 # --------------------------- orchestration ---------------------------
 
 
-async def run_discovery(trigger: str = "manual") -> dict:
+async def run_discovery(
+    trigger: str = "manual",
+    window: Optional[str] = None,
+    top_n: Optional[int] = None,
+) -> dict:
     """Discover trending posts for the active topics, rank, store the top N, and
     generate summaries + comments. Returns a summary dict. Reuses the monitored
-    fetch's convention: per-post failures are logged and never abort the run."""
+    fetch's convention: per-post failures are logged and never abort the run.
+
+    `window` / `top_n` override the env defaults for this run (UI selectors)."""
     global _discovering
     if _discovering:
         return {"skipped": True, "reason": "A discovery run is already in progress."}
     _discovering = True
     try:
-        return await _run_discovery_inner(trigger)
+        return await _run_discovery_inner(trigger, window, top_n)
     finally:
         _discovering = False
 
 
-async def _run_discovery_inner(trigger: str) -> dict:
+async def _run_discovery_inner(
+    trigger: str, window: Optional[str], top_n: Optional[int]
+) -> dict:
     from comments import generate_for_post, generate_summary_for_post
 
     queries = await get_active_topics()
     if not queries:
         return {"skipped": True, "reason": "No active discovery topics configured."}
 
-    window = _window()
+    window = window or _window()
+    keep_n = top_n if top_n and top_n > 0 else _keep_top_n()
     started_at = await _now_iso()
     summary: dict[str, Any] = {
         "trigger": trigger,
@@ -247,7 +290,7 @@ async def _run_discovery_inner(trigger: str) -> dict:
     summary["posts_found"] = len(items)
     # Rank by engagement and keep the top N.
     items.sort(key=score_engagement, reverse=True)
-    top = items[: _keep_top_n()]
+    top = items[:keep_n]
 
     for item in top:
         try:
