@@ -29,19 +29,45 @@
     </div>
     {% endif %}
 
-    <section class="discover-bar">
-        <div class="discover-meta">
-            <strong>Trending</strong> — top {{ keep_top_n }} by engagement, past
-            <code>{{ window }}</code>, for:
-            {% if topics %}
-                {% for t in topics %}<span class="topic-chip">{{ t }}</span>{% endfor %}
-            {% else %}
-                <em>no topics configured (set DISCOVERY_QUERIES)</em>
-            {% endif %}
-        </div>
-        <div class="discover-actions">
-            <button hx-post="/discover/run"
+    <section class="discover-topics">
+        <strong>Topics</strong>
+        {% for t in topics %}
+        <span class="topic-chip {% if not t.active %}topic-inactive{% endif %}">
+            <button hx-post="/discover/topics/{{ t.id }}/toggle"
                     hx-target="#dashboard-main" hx-swap="outerHTML"
+                    class="topic-toggle"
+                    title="{% if t.active %}Active — click to disable{% else %}Disabled — click to enable{% endif %}">{{ t.query }}</button>
+            <button hx-post="/discover/topics/{{ t.id }}/delete"
+                    hx-target="#dashboard-main" hx-swap="outerHTML"
+                    hx-confirm="Remove topic '{{ t.query }}'?"
+                    class="topic-remove" title="Remove">×</button>
+        </span>
+        {% else %}
+        <em class="muted">No topics yet — add one to start discovering.</em>
+        {% endfor %}
+        <form hx-post="/discover/topics" hx-target="#dashboard-main" hx-swap="outerHTML"
+              class="topic-add" hx-on::after-request="this.reset()">
+            <input type="text" name="query" placeholder="Add a topic…" required>
+            <button type="submit" class="btn-small">Add</button>
+        </form>
+    </section>
+
+    <section class="discover-bar">
+        <div class="discover-meta">Find the top posts by engagement for the active topics above.</div>
+        <div class="discover-actions" id="discover-run-params">
+            <label class="discover-field">Window
+                <select name="window">
+                    {% for w in window_options %}
+                    <option value="{{ w }}" {% if w == window %}selected{% endif %}>{{ w }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="discover-field">Keep top
+                <input type="number" name="top_n" value="{{ keep_top_n }}" min="1" max="50">
+            </label>
+            <button hx-post="/discover/run" hx-include="#discover-run-params"
+                    hx-target="#dashboard-main" hx-swap="outerHTML"
+                    {% if not has_active_topic %}disabled title="Add and enable a topic first"{% endif %}
                     hx-confirm="Run trending discovery now? This calls Apify."
                     hx-indicator="#discover-spinner"
                     class="btn-primary">Run discovery now</button>

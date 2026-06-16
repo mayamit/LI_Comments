@@ -11,12 +11,17 @@ from discover import (
     DiscoveryError,
     _keep_top_n,
     _window,
-    get_active_topics,
+    add_topic,
+    delete_topic,
+    get_all_topics,
     get_last_discovery_run,
     promote_author,
     run_discovery,
+    toggle_topic,
 )
 from routers.dashboard import _fetch_posts, _post_status, _set_status_if
+
+WINDOW_OPTIONS = ["24h", "week", "month", "3months", "6months", "year", "any"]
 
 router = APIRouter(prefix="/discover", tags=["discover"])
 templates = Jinja2Templates(directory="templates")
@@ -32,12 +37,14 @@ async def _render(
 ):
     # Trending posts are ranked by engagement, not recency.
     posts = await _fetch_posts("all", source="trending", order="engagement")
-    topics = await get_active_topics()
+    topics = await get_all_topics()
     last_run = await get_last_discovery_run()
     ctx = {
         "posts": posts,
         "topics": topics,
+        "has_active_topic": any(t["active"] for t in topics),
         "window": _window(),
+        "window_options": WINDOW_OPTIONS,
         "keep_top_n": _keep_top_n(),
         "last_run": last_run,
         "active_status": "unreviewed",  # for the shared post-card actions
@@ -57,8 +64,17 @@ async def discover(request: Request):
 
 
 @router.post("/run", response_class=HTMLResponse)
-async def run_now(request: Request):
-    summary = await run_discovery(trigger="manual")
+async def run_now(
+    request: Request,
+    window: str = Form(""),
+    top_n: str = Form(""),
+):
+    win = window.strip() or None
+    try:
+        n = int(top_n) if top_n.strip() else None
+    except ValueError:
+        n = None
+    summary = await run_discovery(trigger="manual", window=win, top_n=n)
     if summary.get("skipped"):
         return await _render(request, full_page=False, error=summary["reason"])
     parts = [
@@ -71,6 +87,27 @@ async def run_now(request: Request):
     if summary["errors"]:
         msg += f" {len(summary['errors'])} errors (see logs)."
     return await _render(request, full_page=False, flash=msg)
+
+
+@router.post("/topics", response_class=HTMLResponse)
+async def create_topic(request: Request, query: str = Form(...)):
+    try:
+        await add_topic(query)
+    except DiscoveryError as e:
+        return await _render(request, full_page=False, error=str(e))
+    return await _render(request, full_page=False, flash=f"Topic added: {query.strip()}")
+
+
+@router.post("/topics/{topic_id}/toggle", response_class=HTMLResponse)
+async def toggle_topic_route(request: Request, topic_id: int):
+    await toggle_topic(topic_id)
+    return await _render(request, full_page=False)
+
+
+@router.post("/topics/{topic_id}/delete", response_class=HTMLResponse)
+async def delete_topic_route(request: Request, topic_id: int):
+    await delete_topic(topic_id)
+    return await _render(request, full_page=False, flash="Topic removed.")
 
 
 @router.post("/posts/{post_id}/promote-author", response_class=HTMLResponse)
