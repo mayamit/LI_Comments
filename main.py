@@ -17,6 +17,7 @@ from database import init_db
 from logging_setup import install_asyncio_exception_handler, setup_logging
 from routers import admin
 from routers import dashboard
+from routers import discover
 from routers import history
 from routers import image_proxy
 from routers import posted
@@ -129,6 +130,7 @@ app.include_router(admin.router)
 app.include_router(tag_admin.router)
 app.include_router(tones_router.router)
 app.include_router(dashboard.router)
+app.include_router(discover.router)
 app.include_router(history.router)
 app.include_router(posted.router)
 app.include_router(image_proxy.router)

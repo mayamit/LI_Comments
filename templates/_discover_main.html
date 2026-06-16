@@ -1,0 +1,72 @@
+{# Shares id="dashboard-main" so the reused _post_card.html HTMX targets resolve. #}
+<div id="dashboard-main">
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+    {% if flash %}<div class="alert alert-success">{{ flash }}</div>{% endif %}
+
+    {% if undo_log_id %}
+    <div class="undo-banner" id="undo-banner-{{ undo_log_id }}">
+        Posted ✓
+        <button hx-post="/discover/posted/{{ undo_log_id }}/undo"
+                hx-target="#dashboard-main" hx-swap="outerHTML"
+                class="btn-small">Undo</button>
+        <span id="undo-timer-{{ undo_log_id }}">10s</span>
+        <script>
+        (function() {
+            const banner = document.getElementById("undo-banner-{{ undo_log_id }}");
+            const timer = document.getElementById("undo-timer-{{ undo_log_id }}");
+            let remaining = 10;
+            const intv = setInterval(() => {
+                remaining -= 1;
+                if (remaining <= 0) {
+                    if (banner) banner.style.display = "none";
+                    clearInterval(intv);
+                } else if (timer) {
+                    timer.textContent = remaining + "s";
+                }
+            }, 1000);
+        })();
+        </script>
+    </div>
+    {% endif %}
+
+    <section class="discover-bar">
+        <div class="discover-meta">
+            <strong>Trending</strong> — top {{ keep_top_n }} by engagement, past
+            <code>{{ window }}</code>, for:
+            {% if topics %}
+                {% for t in topics %}<span class="topic-chip">{{ t }}</span>{% endfor %}
+            {% else %}
+                <em>no topics configured (set DISCOVERY_QUERIES)</em>
+            {% endif %}
+        </div>
+        <div class="discover-actions">
+            <button hx-post="/discover/run"
+                    hx-target="#dashboard-main" hx-swap="outerHTML"
+                    hx-confirm="Run trending discovery now? This calls Apify."
+                    hx-indicator="#discover-spinner"
+                    class="btn-primary">Run discovery now</button>
+            <span id="discover-spinner" class="htmx-indicator inline-spinner">searching…</span>
+        </div>
+    </section>
+
+    {% if last_run %}
+    <p class="muted discover-lastrun">
+        Last run: {{ last_run.ended_at or last_run.started_at }} —
+        {{ last_run.posts_found }} found, {{ last_run.posts_kept }} kept,
+        {{ last_run.error_count }} errors.
+    </p>
+    {% endif %}
+
+    {% if not posts %}
+    <div class="empty-feed">
+        <p>No trending posts yet. Click <strong>Run discovery now</strong> to pull the
+        highest-engagement posts for your topics.</p>
+    </div>
+    {% else %}
+    <div class="posts-feed">
+        {% for p in posts %}
+        {% include "_post_card.html" %}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>

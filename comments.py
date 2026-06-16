@@ -145,8 +145,10 @@ async def regenerate_one_tone(post_id: int, tone_key: str) -> Optional[str]:
     """
     async with get_db() as db:
         cur = await db.execute(
-            "SELECT p.id, p.content, h.linkedin_handle, h.display_name "
-            "FROM posts p JOIN handles h ON p.handle_id = h.id "
+            "SELECT p.id, p.content, "
+            "COALESCE(h.linkedin_handle, p.author_handle) AS linkedin_handle, "
+            "COALESCE(h.display_name, p.author_name) AS display_name "
+            "FROM posts p LEFT JOIN handles h ON p.handle_id = h.id "
             "WHERE p.id = ?",
             (post_id,),
         )
@@ -210,8 +212,10 @@ async def generate_for_post(post_id: int) -> dict:
     """
     async with get_db() as db:
         cur = await db.execute(
-            "SELECT p.id, p.content, h.linkedin_handle, h.display_name "
-            "FROM posts p JOIN handles h ON p.handle_id = h.id "
+            "SELECT p.id, p.content, "
+            "COALESCE(h.linkedin_handle, p.author_handle) AS linkedin_handle, "
+            "COALESCE(h.display_name, p.author_name) AS display_name "
+            "FROM posts p LEFT JOIN handles h ON p.handle_id = h.id "
             "WHERE p.id = ?",
             (post_id,),
         )

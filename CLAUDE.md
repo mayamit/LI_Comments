@@ -19,6 +19,7 @@ LI_Comments/
 ├── main.py                  # FastAPI app entry point, scheduler init
 ├── database.py              # DB connection, schema init, query helpers
 ├── agent.py                 # Fetch + generate pipeline (Apify → Claude)
+├── discover.py              # Trending post discovery (Apify post-search → rank → Claude)
 ├── tones.py                 # All 6 tone prompt templates (single source of truth)
 ├── routers/
 │   ├── admin.py             # Handle CRUD, run-now trigger
@@ -101,6 +102,10 @@ CLAUDE_TIMEOUT_S=120
 FETCH_SCHEDULE_ENABLED=0     # set 1 to enable the daily scheduled fetch
 FETCH_SCHEDULE_HOUR=6        # 24h, default 6am
 FETCH_SCHEDULE_MINUTE=0
+DISCOVERY_QUERIES=           # comma-separated topics; seeds discovery_topics on first run
+DISCOVERY_WINDOW=week        # any|1h|24h|week|month|3months|6months|year
+DISCOVERY_MAX_POSTS_PER_QUERY=25
+DISCOVERY_KEEP_TOP_N=10      # top-N posts kept per discovery run, ranked by engagement
 DATABASE_PATH=./li_comments.db
 LOG_LEVEL=INFO
 LOG_DIR=./logs

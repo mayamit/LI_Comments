@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Trending · LinkedIn Comment Generator{% endblock %}
+{% block content %}
+{% include "_discover_main.html" %}
+
+<script>
+function liCopy(btn, commentEl, postId) {
+    const text = (commentEl.value !== undefined ? commentEl.value : commentEl.innerText).trim();
+    navigator.clipboard.writeText(text).then(() => {
+        const original = btn.innerText;
+        btn.innerText = "Copied!";
+        btn.classList.add("copied");
+        setTimeout(() => {
+            btn.innerText = original;
+            btn.classList.remove("copied");
+        }, 1500);
+        fetch(`/dashboard/posts/${postId}/mark-reviewed`, { method: "POST" });
+    }).catch(err => {
+        btn.innerText = "Copy failed";
+        console.error(err);
+    });
+}
+</script>
+{% endblock %}

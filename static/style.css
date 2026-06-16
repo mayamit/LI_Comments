@@ -906,3 +906,38 @@ a.tag-chip.active { box-shadow: inset 0 0 0 2px rgba(0,0,0,0.15); font-weight: 6
     gap: 0.45rem;
     font-size: 0.9rem;
 }
+
+/* Trending discovery view */
+.discover-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+.discover-meta { font-size: 0.9rem; }
+.discover-actions { display: flex; align-items: center; gap: 0.5rem; }
+.discover-lastrun { font-size: 0.8rem; margin: 0 0 0.75rem; }
+.topic-chip {
+    display: inline-block;
+    background: #eef3fb;
+    color: #2257a8;
+    border-radius: 999px;
+    padding: 0.1rem 0.55rem;
+    font-size: 0.8rem;
+    margin: 0 0.2rem;
+}
+.engagement-score {
+    font-weight: 600;
+    color: #c2410c;
+}
+.monitoring-badge {
+    display: inline-block;
+    background: #e6f4ea;
+    color: #1e7a3d;
+    border-radius: 4px;
+    padding: 0.1rem 0.45rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}

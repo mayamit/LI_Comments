@@ -85,20 +85,38 @@ async def _fetch_posted_tones(post_ids: list[int]) -> dict[int, str]:
     return {r["post_id"]: r["tone"] for r in rows}
 
 
-async def _fetch_posts(status: str) -> list[dict]:
-    if status == "all":
-        where, params = "", ()
+async def _fetch_posts(
+    status: str, source: str = "monitored", order: str = "recent"
+) -> list[dict]:
+    # Trending posts share the posts table; the source filter keeps the monitored
+    # dashboard and the discovery view from intermixing. Treat legacy NULL as monitored.
+    clauses, params = [], []
+    if source == "monitored":
+        clauses.append("(p.source = 'monitored' OR p.source IS NULL)")
     else:
-        where, params = "WHERE p.status = ?", (status,)
+        clauses.append("p.source = ?")
+        params.append(source)
+    if status != "all":
+        clauses.append("p.status = ?")
+        params.append(status)
+    where = "WHERE " + " AND ".join(clauses)
+    order_sql = (
+        "ORDER BY p.engagement_score DESC, p.id DESC"
+        if order == "engagement"
+        else "ORDER BY COALESCE(p.posted_at, p.fetched_at) DESC, p.id DESC"
+    )
     async with get_db() as db:
         cur = await db.execute(
             f"""
             SELECT p.id, p.post_id, p.content, p.summary, p.url, p.engagement_json,
-                   p.posted_at, p.fetched_at, p.status,
-                   h.linkedin_handle, h.display_name, h.deleted_at AS handle_deleted_at
-            FROM posts p JOIN handles h ON p.handle_id = h.id
+                   p.posted_at, p.fetched_at, p.status, p.engagement_score, p.source,
+                   COALESCE(h.linkedin_handle, p.author_handle) AS linkedin_handle,
+                   COALESCE(h.display_name, p.author_name) AS display_name,
+                   h.deleted_at AS handle_deleted_at,
+                   p.handle_id
+            FROM posts p LEFT JOIN handles h ON p.handle_id = h.id
             {where}
-            ORDER BY COALESCE(p.posted_at, p.fetched_at) DESC, p.id DESC
+            {order_sql}
             """,
             params,
         )
@@ -168,6 +186,9 @@ async def _fetch_posts(status: str) -> list[dict]:
                 "is_posted_status": r["status"] == "posted",
                 "already_posted": posted_tone is not None,
                 "posted_tone_name": tone_names.get(posted_tone) if posted_tone else None,
+                "engagement_score": r["engagement_score"],
+                "author_monitored": r["handle_id"] is not None,
+                "is_trending": r["source"] == "trending",
             }
         )
     return posts
