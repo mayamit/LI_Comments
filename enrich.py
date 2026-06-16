@@ -293,6 +293,7 @@ async def enrich_handle(handle_id: int, handle_name: str) -> dict:
     try:
         profile = await fetch_profile(handle_name)
     except EnrichmentError as e:
+        logger.warning("Profile fetch failed for %s: %s", handle_name, e)
         result["error"] = str(e)
         return result
 
@@ -375,6 +376,16 @@ async def enrich_untagged_handles() -> dict:
                 logger.exception("Enrichment crashed for %s", name)
                 summary["failed"] += 1
                 summary["details"].append({"handle": name, "error": str(e)})
+        failed_handles = [
+            d["handle"] for d in summary["details"] if d.get("error")
+        ]
+        logger.info(
+            "Auto-tag run done: %d handles, %d enriched, %d errors%s",
+            summary["handles_processed"],
+            summary["succeeded"],
+            summary["failed"],
+            f" (failed: {', '.join(failed_handles)})" if failed_handles else "",
+        )
         return summary
     finally:
         _enriching = False
