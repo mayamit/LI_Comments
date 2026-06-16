@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS handles (
 
 CREATE TABLE IF NOT EXISTS posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    handle_id INTEGER REFERENCES handles(id),
+    handle_id INTEGER REFERENCES handles(id),   -- NULL for trending posts until the author is promoted
     post_id TEXT UNIQUE NOT NULL,
     content TEXT,
     summary TEXT,
@@ -25,7 +25,11 @@ CREATE TABLE IF NOT EXISTS posts (
     engagement_json TEXT,
     posted_at TEXT,
     fetched_at TEXT DEFAULT (datetime('now')),
-    status TEXT DEFAULT 'unreviewed'
+    status TEXT DEFAULT 'unreviewed',
+    source TEXT DEFAULT 'monitored',            -- 'monitored' | 'trending'
+    engagement_score INTEGER,                    -- cached rank key for trending
+    author_handle TEXT,                          -- trending: inline author (no handles row yet)
+    author_name TEXT
 );
 
 CREATE TABLE IF NOT EXISTS generated_comments (
@@ -79,6 +83,27 @@ CREATE TABLE IF NOT EXISTS handle_tags (
 );
 
 CREATE INDEX IF NOT EXISTS idx_handle_tags_tag ON handle_tags(tag_id);
+
+CREATE TABLE IF NOT EXISTS discovery_topics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    query TEXT UNIQUE NOT NULL,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS discovery_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    trigger TEXT NOT NULL,
+    queries TEXT,            -- JSON array of search queries used
+    window TEXT,             -- postedLimit value
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    posts_found INTEGER DEFAULT 0,
+    posts_kept INTEGER DEFAULT 0,
+    skipped_duplicates INTEGER DEFAULT 0,
+    error_count INTEGER DEFAULT 0,
+    summary_json TEXT
+);
 """
 
 # (slug, label, dimension, description, sort_order)
@@ -145,6 +170,16 @@ async def _migrate(db: aiosqlite.Connection) -> None:
     cols = [r[1] for r in await cur.fetchall()]
     if "summary" not in cols:
         await db.execute("ALTER TABLE posts ADD COLUMN summary TEXT")
+    if "source" not in cols:
+        await db.execute("ALTER TABLE posts ADD COLUMN source TEXT DEFAULT 'monitored'")
+    if "engagement_score" not in cols:
+        await db.execute("ALTER TABLE posts ADD COLUMN engagement_score INTEGER")
+    if "author_handle" not in cols:
+        await db.execute("ALTER TABLE posts ADD COLUMN author_handle TEXT")
+    if "author_name" not in cols:
+        await db.execute("ALTER TABLE posts ADD COLUMN author_name TEXT")
+    # Index created here (not in SCHEMA) so it runs after the source column exists.
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_posts_source ON posts(source)")
 
     cur = await db.execute("PRAGMA table_info(posted_log)")
     cols = [r[1] for r in await cur.fetchall()]
@@ -180,12 +215,29 @@ async def _seed_handle(db: aiosqlite.Connection) -> None:
     )
 
 
+async def _seed_discovery_topics(db: aiosqlite.Connection) -> None:
+    """Seed trending-discovery topics from DISCOVERY_QUERIES, but only when the
+    table is empty. Topics are editable afterwards (DB now, UI later) without a
+    code change, so this never overwrites the user's curated list."""
+    cur = await db.execute("SELECT 1 FROM discovery_topics LIMIT 1")
+    if await cur.fetchone() is not None:
+        return
+    raw = os.getenv("DISCOVERY_QUERIES", "")
+    queries = [q.strip() for q in raw.split(",") if q.strip()]
+    if queries:
+        await db.executemany(
+            "INSERT OR IGNORE INTO discovery_topics (query) VALUES (?)",
+            [(q,) for q in queries],
+        )
+
+
 async def init_db() -> None:
     async with aiosqlite.connect(db_path()) as db:
         await db.executescript(SCHEMA)
         await _migrate(db)
         await _seed_tags(db)
         await _seed_handle(db)
+        await _seed_discovery_topics(db)
         await db.commit()
 
 
