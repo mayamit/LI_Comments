@@ -117,6 +117,16 @@ SEED_TAGS = [
 ]
 
 
+# Seeded into a brand-new (empty) handles table so a fresh install isn't blank.
+# (linkedin_handle, display_name, active, notes)
+SEED_HANDLE = (
+    "agandhi5",
+    "Amit Gandhi - Co-Founder and CTO at Parkar, AI Visionary",
+    1,
+    "Owner — seeded on first run",
+)
+
+
 def db_path() -> str:
     return os.getenv("DATABASE_PATH", "./li_comments.db")
 
@@ -154,11 +164,28 @@ async def _seed_tags(db: aiosqlite.Connection) -> None:
     )
 
 
+async def _seed_handle(db: aiosqlite.Connection) -> None:
+    """Seed the owner handle, but only when the handles table is completely
+    empty. This gives a fresh install a starting entry without ever re-adding
+    it if the user later deletes it or on an already-populated database."""
+    cur = await db.execute("SELECT 1 FROM handles LIMIT 1")
+    if await cur.fetchone() is not None:
+        return
+    await db.execute(
+        """
+        INSERT INTO handles (linkedin_handle, display_name, active, notes)
+        VALUES (?, ?, ?, ?)
+        """,
+        SEED_HANDLE,
+    )
+
+
 async def init_db() -> None:
     async with aiosqlite.connect(db_path()) as db:
         await db.executescript(SCHEMA)
         await _migrate(db)
         await _seed_tags(db)
+        await _seed_handle(db)
         await db.commit()
 
 

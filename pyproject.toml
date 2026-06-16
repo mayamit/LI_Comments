@@ -1,0 +1,9 @@
+[project]
+name = "li-comments"
+version = "0.1.0"
+description = "Personal LinkedIn engagement tool — fetches posts and drafts tonally-distinct comment options for manual review."
+requires-python = ">=3.10"
+
+# Runtime dependencies are managed via requirements.txt (pip install -r
+# requirements.txt). This file exists primarily to pin the supported Python
+# version; tooling (pip, uv, IDEs) reads requires-python from here.

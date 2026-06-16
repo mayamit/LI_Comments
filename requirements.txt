@@ -7,3 +7,4 @@ apscheduler>=3.10
 httpx>=0.27
 python-dotenv>=1.0
 pyyaml>=6.0
+psutil>=5.9

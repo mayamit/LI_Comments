@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """start.py — start the LI_Comments server if it isn't already running.
 
-Python equivalent of start.sh. Checks whether something is already listening
-on the app's port. If so it warns and exits without touching it — unless
---force/--restart is given, in which case it stops the existing process first.
-Otherwise it starts uvicorn (preferring the project's .venv) detached, logging
-to logs/server.out.
+Cross-platform (macOS, Linux, Windows). Checks whether something is already
+listening on the app's port. If so it warns and exits without touching it —
+unless --force/--restart is given, in which case it stops the existing process
+first. Otherwise it starts uvicorn (preferring the project's .venv) detached,
+logging to logs/server.out.
 
 Usage:
     ./start.py                  # start on 127.0.0.1:8000 (warn if already up)
@@ -13,14 +13,17 @@ Usage:
     ./start.py --restart        # alias for --force
     PORT=9000 ./start.py        # override port
     HOST=0.0.0.0 ./start.py
+
+On Windows, invoke it as:  python start.py [--force]
 """
 import argparse
 import os
-import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+import psutil
 
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = os.getenv("PORT", "8000")
@@ -29,49 +32,75 @@ SERVER_OUT = LOG_DIR / "server.out"
 
 
 def listeners(port: str) -> list[int]:
-    """PIDs listening on the given TCP port (via lsof)."""
-    try:
-        out = subprocess.run(
-            ["lsof", "-ti", f"tcp:{port}", "-sTCP:LISTEN"],
-            capture_output=True,
-            text=True,
-        ).stdout
-    except FileNotFoundError:
-        sys.exit("ERROR: 'lsof' not found — required to detect a running server.")
-    return [int(p) for p in out.split()]
+    """PIDs of processes listening on the given TCP port.
+
+    Iterates per-process rather than calling the global psutil.net_connections,
+    which requires root on macOS. We only need to find the server we started
+    (owned by this user), so AccessDenied on other users' processes is skipped.
+    """
+    want = int(port)
+    pids: list[int] = []
+    for proc in psutil.process_iter(["pid"]):
+        try:
+            conns = (
+                proc.net_connections(kind="inet")
+                if hasattr(proc, "net_connections")
+                else proc.connections(kind="inet")  # psutil < 6.0
+            )
+            for c in conns:
+                if (
+                    c.status == psutil.CONN_LISTEN
+                    and c.laddr
+                    and c.laddr.port == want
+                ):
+                    pids.append(proc.pid)
+                    break
+        except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess):
+            continue
+    return pids
 
 
-def uvicorn_cmd() -> str:
-    venv = Path(".venv/bin/uvicorn")
-    if venv.is_file() and os.access(venv, os.X_OK):
-        return str(venv)
+def uvicorn_cmd() -> list[str]:
+    """Argv prefix to run uvicorn, preferring the project's virtualenv."""
+    candidates = [
+        Path(".venv/bin/uvicorn"),          # POSIX venv
+        Path(".venv/Scripts/uvicorn.exe"),  # Windows venv
+    ]
+    for c in candidates:
+        if c.is_file():
+            return [str(c)]
     from shutil import which
 
     found = which("uvicorn")
-    if not found:
-        sys.exit("ERROR: uvicorn not found (.venv/bin/uvicorn or on PATH).")
-    return found
+    if found:
+        return [found]
+    # Last resort: run via the current interpreter's module form.
+    return [sys.executable, "-m", "uvicorn"]
 
 
 def stop(pids: list[int]) -> None:
     print(f"Stopping existing server on port {PORT} (PID {' '.join(map(str, pids))})...")
+    procs: list[psutil.Process] = []
     for pid in pids:
         try:
-            os.kill(pid, signal.SIGTERM)
-        except ProcessLookupError:
+            procs.append(psutil.Process(pid))
+        except psutil.NoSuchProcess:
             pass
-    # Wait up to ~10s for the port to free, then escalate to SIGKILL.
-    for _ in range(20):
-        time.sleep(0.5)
-        if not listeners(PORT):
-            return
-    print("Process didn't exit gracefully — sending SIGKILL.")
-    for pid in listeners(PORT):
+    for p in procs:
         try:
-            os.kill(pid, signal.SIGKILL)
-        except ProcessLookupError:
+            p.terminate()  # SIGTERM on POSIX, TerminateProcess on Windows
+        except psutil.NoSuchProcess:
             pass
-    time.sleep(1)
+    # Wait up to ~10s for graceful exit, then escalate.
+    _, alive = psutil.wait_procs(procs, timeout=10)
+    if alive:
+        print("Process didn't exit gracefully — killing.")
+        for p in alive:
+            try:
+                p.kill()
+            except psutil.NoSuchProcess:
+                pass
+        psutil.wait_procs(alive, timeout=3)
 
 
 def main() -> int:
@@ -106,14 +135,24 @@ def main() -> int:
             return 1
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"Starting server on http://{HOST}:{PORT}  (using {uvicorn})")
+    print(f"Starting server on http://{HOST}:{PORT}  (using {' '.join(uvicorn)})")
     out = open(SERVER_OUT, "a")
+
+    # Detach so the server survives this script / terminal exit.
+    detach_kwargs: dict = {}
+    if os.name == "nt":
+        detach_kwargs["creationflags"] = (
+            subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+        )
+    else:
+        detach_kwargs["start_new_session"] = True
+
     proc = subprocess.Popen(
-        [uvicorn, "main:app", "--host", HOST, "--port", PORT],
+        [*uvicorn, "main:app", "--host", HOST, "--port", PORT],
         stdout=out,
         stderr=subprocess.STDOUT,
         stdin=subprocess.DEVNULL,
-        start_new_session=True,  # detach: survives this script / terminal exit
+        **detach_kwargs,
     )
 
     # Give it a moment, then confirm it actually came up.

@@ -10,7 +10,7 @@ A personal LinkedIn engagement tool. It monitors a curated list of LinkedIn prof
 | Frontend | Jinja2 templates + HTMX (no React) |
 | Database | SQLite via raw `sqlite3` or `aiosqlite` |
 | Scheduler | APScheduler (runs inside the app) |
-| LLM | Anthropic Claude API (`claude-sonnet-4-6`) |
+| LLM | Claude via the `claude` CLI (Claude Code subscription); model `claude-sonnet-4-6` |
 | LinkedIn data | Apify (`harvestapi~linkedin-profile-posts`) |
 
 ## Project Structure
@@ -91,12 +91,19 @@ Defined in `tones.py`. Never hardcode tone logic outside this file.
 | `concise` | Concise | One punchy sentence |
 
 ## Environment Variables
+Comment generation runs through the `claude` CLI (Claude Code subscription),
+**not** the Anthropic API — there is no `ANTHROPIC_API_KEY`. See `.env.example`.
 ```
-ANTHROPIC_API_KEY=
-APIFY_TOKEN=
+APIFY_TOKEN=                 # required — Apify access for LinkedIn post fetching
+CLAUDE_CLI=claude            # optional — path to the claude CLI (default: on PATH)
+CLAUDE_MODEL=claude-sonnet-4-6
+CLAUDE_TIMEOUT_S=120
+FETCH_SCHEDULE_ENABLED=0     # set 1 to enable the daily scheduled fetch
 FETCH_SCHEDULE_HOUR=6        # 24h, default 6am
 FETCH_SCHEDULE_MINUTE=0
 DATABASE_PATH=./li_comments.db
+LOG_LEVEL=INFO
+LOG_DIR=./logs
 ```
 
 ## Key Conventions
@@ -115,11 +122,16 @@ DATABASE_PATH=./li_comments.db
 - Fetch results from `GET /v2/datasets/{dataset_id}/items`
 - Post content is in the `content` field (Unicode NFKD-normalize it to strip LinkedIn bold/italic)
 
-### Anthropic Claude API
-- Model: `claude-sonnet-4-6`
-- One API call per tone per post (6 calls per new post)
-- Keep comments to 1–4 sentences, LinkedIn reply length
-- Use prompt caching on the system prompt if generating many comments in one run
+### Claude (via the `claude` CLI)
+- Comment generation shells out to the `claude` CLI (`comments.py`), using the
+  user's Claude Code subscription — **no Anthropic API key, no per-call cost**.
+- Invocation: `claude -p <prompt> --model <CLAUDE_MODEL>`, run from a temp cwd so
+  the CLI doesn't load this project's `CLAUDE.md` as context.
+- Model: `claude-sonnet-4-6` (override via `CLAUDE_MODEL`); CLI path via `CLAUDE_CLI`.
+- One CLI call per tone per post, run in parallel; timeout `CLAUDE_TIMEOUT_S` (120s).
+- Keep comments to 1–4 sentences, LinkedIn reply length.
+- **Prerequisite:** the `claude` CLI must be installed and on `PATH` (or `CLAUDE_CLI`
+  set), and logged in. Without it, comment generation fails for every tone.
 
 ## GitHub Issues
 - Epics: #1–#6
