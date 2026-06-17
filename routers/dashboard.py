@@ -59,8 +59,13 @@ def _parse_images(raw: Optional[str]) -> list[dict]:
 
 
 async def _fetch_status_counts() -> dict:
+    # Scoped to monitored posts so the tab counts match the dashboard feed,
+    # which excludes trending posts (those live on /discover).
     async with get_db() as db:
-        cur = await db.execute("SELECT status, COUNT(*) AS c FROM posts GROUP BY status")
+        cur = await db.execute(
+            "SELECT status, COUNT(*) AS c FROM posts "
+            "WHERE source = 'monitored' OR source IS NULL GROUP BY status"
+        )
         rows = await cur.fetchall()
     counts = {s: 0 for s in VALID_STATUSES}
     counts["all"] = 0
