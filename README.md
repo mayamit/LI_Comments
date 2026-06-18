@@ -1,6 +1,6 @@
 # LI_Comments
 
-A personal LinkedIn engagement tool. Monitors a curated list of profiles, fetches their latest posts daily, generates 6 tonally-distinct comment options per post with Claude, and presents them in a morning review dashboard. Posting to LinkedIn is always manual — this app never writes to LinkedIn.
+A personal LinkedIn engagement tool. Monitors a curated list of profiles, fetches their latest posts daily, generates seven tonally-distinct comment options per post with Claude, and presents them in a morning review dashboard. Posting to LinkedIn is always manual — this app never writes to LinkedIn.
 
 See [`CLAUDE.md`](./CLAUDE.md) for architecture, schema, and conventions.
 
@@ -63,6 +63,37 @@ the generated `tones.yaml`, then start the app.
 Your `tones.yaml` and your personal profile stay local (gitignored) — only the
 template and example are tracked, so each user keeps their own voice.
 
+## Using the app
+
+The app never posts to LinkedIn — every comment is copied and posted by you manually. Day to day it works in three loops.
+
+### 1. Monitor → review (the core loop)
+
+1. **Add profiles** on the **Handles** page (the `linkedin.com/in/<handle>` slug). Mark the ones you want fetched as active.
+2. **Fetch posts** — click **Run Now** on the Handles page (or enable the daily schedule, below). For each new post the app stores it, writes a TL;DR summary, and generates the seven tonally-distinct comment options.
+3. **Review** on the **Dashboard**. Each post shows the summary, the original, and the seven options. Edit any option inline, **Copy** it (which marks the post reviewed), then paste it into LinkedIn yourself. **Mark posted** records which tone you used; **Dismiss** drops posts you're skipping. Tabs filter by status (Unreviewed / Reviewed / Posted / Dismissed).
+
+### 2. Auto-tag (profile enrichment)
+
+On the **Handles** page, **Auto-tag** enriches untagged handles via Apify: it derives reach (follower buckets), posting cadence, and 1–2 persona tags, and sets a clean display name. Intent tags are left alone — those are your manual call. (First run may need a one-time Apify actor approval — see below.)
+
+### 3. Trending discovery
+
+The **Trending** page finds the highest-engagement posts on topics you care about, beyond your monitored list.
+
+1. **Add topics** in the Topics bar (e.g. `AI agents`, `platform engineering`). Toggle a topic to enable/disable it, or remove it. Topics persist in the database — no `.env` edit needed. `DISCOVERY_QUERIES` only seeds the initial list on a fresh install.
+2. **Run discovery** — pick a time window (`24h … year`) and how many top posts to keep, then **Run discovery now**. The app searches via Apify, ranks results by engagement (`reactions + 2·comments + 3·reposts`), keeps the top N, and runs them through the same summary + seven-tone pipeline.
+3. **Review** the ranked posts (🔥 = engagement score) just like the dashboard. **Monitor this author** promotes a discovered author into your monitored Handles list so their future posts are fetched automatically.
+
+### Scheduling (optional)
+
+Both the daily fetch and daily discovery are off by default. Enable them in `.env`:
+
+- `FETCH_SCHEDULE_ENABLED=1` (+ `FETCH_SCHEDULE_HOUR`/`MINUTE`) — daily monitored-handle fetch.
+- `DISCOVERY_SCHEDULE_ENABLED=1` (+ `DISCOVERY_SCHEDULE_HOUR`/`MINUTE`) — daily trending discovery.
+
+Restart the server after changing `.env`. Without these, use the **Run Now** buttons on demand.
+
 ## Required environment variables
 
 | Variable | Purpose |
@@ -77,3 +108,12 @@ Optional: `FETCH_SCHEDULE_HOUR`, `FETCH_SCHEDULE_MINUTE`, `DATABASE_PATH`, `CLAU
 ## Apify: approve the actor on first run
 
 The first time you use **Handles → Auto-tag** (profile enrichment) or **Trending**, Apify may reject the run with `403 full-permission-actor-not-approved`. The `harvestapi` actors request account access that you approve once: open the actor in the [Apify console](https://console.apify.com/) (e.g. `harvestapi/linkedin-profile-scraper`), approve its permissions, then re-run. Pay-per-result actors draw from your Apify credit (the free plan includes a monthly allowance), so no top-up is needed for normal personal use.
+
+## Running the tests
+
+```bash
+pip install -r requirements.txt   # includes pytest + pytest-asyncio
+pytest
+```
+
+Tests use a temporary SQLite database per test and never call Apify or the `claude` CLI, so they run offline.
