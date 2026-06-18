@@ -28,6 +28,12 @@ from routers import tones as tones_router
 load_dotenv()
 setup_logging()
 
+# Owner name shown in the page header, configurable per deployment.
+# Set after load_dotenv() so the registered value reflects .env.
+_OWNER_NAME = os.getenv("OWNER_NAME", "Amit Gandhi")
+for _mod in (admin, dashboard, discover, history, posted, tag_admin, tones_router):
+    _mod.templates.env.globals["owner_name"] = _OWNER_NAME
+
 REQUIRED_ENV = ["APIFY_TOKEN"]
 
 
