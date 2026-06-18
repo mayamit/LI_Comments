@@ -68,7 +68,12 @@ template and example are tracked, so each user keeps their own voice.
 | Variable | Purpose |
 |---|---|
 | `APIFY_TOKEN` | Apify access (LinkedIn post fetching) |
+| `OWNER_NAME` | Name shown in the app header (default: `Amit Gandhi`) |
 
 Comment generation uses the `claude` CLI (Claude Code subscription) rather than the Anthropic API, so no API key is required. The CLI must be installed and on `PATH`. Override with `CLAUDE_CLI` and `CLAUDE_MODEL` if needed.
 
-Optional: `FETCH_SCHEDULE_HOUR`, `FETCH_SCHEDULE_MINUTE`, `DATABASE_PATH`, `CLAUDE_TIMEOUT_S` — see `.env.example`.
+Optional: `FETCH_SCHEDULE_HOUR`, `FETCH_SCHEDULE_MINUTE`, `DATABASE_PATH`, `CLAUDE_TIMEOUT_S`, and the `DISCOVERY_*` trending-discovery settings — see `.env.example`.
+
+## Apify: approve the actor on first run
+
+The first time you use **Handles → Auto-tag** (profile enrichment) or **Trending**, Apify may reject the run with `403 full-permission-actor-not-approved`. The `harvestapi` actors request account access that you approve once: open the actor in the [Apify console](https://console.apify.com/) (e.g. `harvestapi/linkedin-profile-scraper`), approve its permissions, then re-run. Pay-per-result actors draw from your Apify credit (the free plan includes a monthly allowance), so no top-up is needed for normal personal use.

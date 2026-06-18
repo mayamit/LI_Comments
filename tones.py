@@ -11,6 +11,9 @@ from typing import Optional
 import yaml
 
 TONES_FILE = Path(__file__).parent / "tones.yaml"
+# Shipped template. tones.yaml is gitignored (each user forks their own), so on
+# a fresh clone we read from the example until the first edit writes tones.yaml.
+EXAMPLE_FILE = Path(__file__).parent / "tones.example.yaml"
 KEY_RE = re.compile(r"^[a-z0-9_]{1,40}$")
 
 _lock = Lock()
@@ -34,9 +37,11 @@ class ToneError(ValueError):
 
 
 def load() -> dict:
-    """Read tones.yaml fresh on every call so edits land immediately."""
+    """Read tones fresh on every call so edits land immediately. Falls back to
+    tones.example.yaml when the user hasn't created their own tones.yaml yet."""
+    source = TONES_FILE if TONES_FILE.exists() else EXAMPLE_FILE
     with _lock:
-        with TONES_FILE.open() as f:
+        with source.open() as f:
             data = yaml.safe_load(f) or {}
     data.setdefault("shared_system_prompt", "")
     data.setdefault("tones", [])

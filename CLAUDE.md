@@ -96,6 +96,7 @@ Comment generation runs through the `claude` CLI (Claude Code subscription),
 **not** the Anthropic API — there is no `ANTHROPIC_API_KEY`. See `.env.example`.
 ```
 APIFY_TOKEN=                 # required — Apify access for LinkedIn post fetching
+OWNER_NAME=Amit Gandhi       # name shown in the app header (default: Amit Gandhi)
 CLAUDE_CLI=claude            # optional — path to the claude CLI (default: on PATH)
 CLAUDE_MODEL=claude-sonnet-4-6
 CLAUDE_TIMEOUT_S=120
