@@ -1,7 +1,7 @@
 # LI_Comments — Claude Code Guide
 
 ## Project Overview
-A personal LinkedIn engagement tool. It monitors a curated list of LinkedIn profiles, fetches their latest posts daily, generates 6 comment options per post using Claude (each with a distinct tone), and presents them in a morning dashboard for review. Posting to LinkedIn is always done manually by the user — this app never writes to LinkedIn.
+A personal LinkedIn engagement tool. It monitors a curated list of LinkedIn profiles, fetches their latest posts daily, generates seven comment options per post using Claude (each with a distinct tone), and presents them in a morning dashboard for review. Posting to LinkedIn is always done manually by the user — this app never writes to LinkedIn.
 
 ## Tech Stack
 | Layer | Choice |
@@ -20,7 +20,8 @@ LI_Comments/
 ├── database.py              # DB connection, schema init, query helpers
 ├── agent.py                 # Fetch + generate pipeline (Apify → Claude)
 ├── discover.py              # Trending post discovery (Apify post-search → rank → Claude)
-├── tones.py                 # All 6 tone prompt templates (single source of truth)
+├── tones.yaml               # All 7 tone prompt templates (single source of truth)
+├── tones.py                 # Loads/saves tones.yaml; tone helpers
 ├── routers/
 │   ├── admin.py             # Handle CRUD, run-now trigger
 │   ├── dashboard.py         # Morning feed, comment selection
@@ -79,8 +80,8 @@ CREATE TABLE posted_log (
 );
 ```
 
-## The 6 Tones
-Defined in `tones.py`. Never hardcode tone logic outside this file.
+## The 7 Tones
+Defined in `tones.yaml` (loaded via `tones.py`). Never hardcode tone logic elsewhere.
 
 | Key | Name | Intent |
 |---|---|---|
@@ -90,6 +91,7 @@ Defined in `tones.py`. Never hardcode tone logic outside this file.
 | `contrarian` | Contrarian | Respectful pushback or alternative view |
 | `affirming` | Affirming | Builds on their point, adds a layer |
 | `concise` | Concise | One punchy sentence |
+| `reference` | Popular Reference | Cites a book, song, or pop-culture reference |
 
 ## Environment Variables
 Comment generation runs through the `claude` CLI (Claude Code subscription),
@@ -118,7 +120,7 @@ LOG_DIR=./logs
 ## Key Conventions
 - **No LinkedIn writes** — this app never posts, comments, or interacts with LinkedIn programmatically
 - **Deduplication** — always check `posts.post_id` before inserting; skip silently if exists
-- **Tone config** — all prompt templates live in `tones.py`; adding a tone = adding one entry there, nothing else
+- **Tone config** — all prompt templates live in `tones.yaml`; adding a tone = adding one entry there, nothing else
 - **HTMX over JavaScript** — prefer HTMX attributes for dynamic UI (inline edit, copy button, status filters) over writing custom JS
 - **No ORMs** — use raw SQL via `sqlite3`/`aiosqlite` to keep the dependency footprint minimal
 - **Errors don't abort runs** — if Apify or Claude fails for one handle/tone, log it and continue; never let one failure kill the whole agent run
