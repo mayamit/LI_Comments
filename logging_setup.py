@@ -72,11 +72,12 @@ def setup_logging() -> Path:
     # faulthandler.enable() already covers fatal signals (SIGSEGV/SIGABRT/...).
     # Additionally dump live Python stacks on SIGTERM — the signal used to kill
     # the process — so we can see *what it was doing* when it was told to die.
+    # faulthandler.register is Unix-only — absent on Windows entirely.
     sigterm = getattr(signal, "SIGTERM", None)
-    if sigterm is not None:
+    if sigterm is not None and hasattr(faulthandler, "register"):
         try:
             faulthandler.register(sigterm, file=_FAULT_FP, all_threads=True, chain=True)
-        except (ValueError, OSError, RuntimeError):
+        except (ValueError, OSError, RuntimeError, AttributeError):
             pass  # not on the main thread / unsupported — non-fatal
 
     # Record uncaught exceptions before the interpreter tears down.
