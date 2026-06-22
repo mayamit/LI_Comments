@@ -19,3 +19,6 @@ tones.yaml
 
 # Runtime logs
 logs/
+
+# Local masterclass / scratch HTML — not part of the app
+LI_Comments_Masterclass.html
