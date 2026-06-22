@@ -11,6 +11,7 @@ Usage:
     ./start.py                  # start on 127.0.0.1:8000 (warn if already up)
     ./start.py --force          # stop any running server, then start
     ./start.py --restart        # alias for --force
+    ./start.py --stop           # stop any running server and exit
     PORT=9000 ./start.py        # override port
     HOST=0.0.0.0 ./start.py
 
@@ -117,7 +118,21 @@ def main() -> int:
         action="store_true",
         help="stop any running server on the port, then start",
     )
+    parser.add_argument(
+        "-s", "--stop",
+        dest="stop",
+        action="store_true",
+        help="stop any running server on the port and exit",
+    )
     args = parser.parse_args()
+
+    if args.stop:
+        running = listeners(PORT)
+        if running:
+            stop(running)
+            return 0
+        print(f"No server running on port {PORT}.")
+        return 0
 
     uvicorn = uvicorn_cmd()
 

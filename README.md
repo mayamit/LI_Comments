@@ -16,6 +16,8 @@ See [`CLAUDE.md`](./CLAUDE.md) for architecture, schema, and conventions.
 ## Quick start (macOS / Linux)
 
 ```bash
+git clone https://github.com/mayamit/LI_Comments.git
+cd LI_Comments
 python3 -m venv .venv && source .venv/bin/activate
 cp .env.example .env             # then fill in APIFY_TOKEN
 cp tones.example.yaml tones.yaml # starter voice config (personalise it below)
@@ -34,6 +36,8 @@ To run the server detached (logs to `./logs/server.out`), use `python start.py`
 run the steps directly in PowerShell or Command Prompt:
 
 ```powershell
+git clone https://github.com/mayamit/LI_Comments.git
+cd LI_Comments
 python -m venv .venv
 .venv\Scripts\activate
 copy .env.example .env             # then edit and fill in APIFY_TOKEN
