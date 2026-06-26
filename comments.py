@@ -26,6 +26,24 @@ def _timeout_s() -> int:
     return int(os.getenv("CLAUDE_TIMEOUT_S", "120"))
 
 
+def _max_concurrency() -> int:
+    return max(1, int(os.getenv("CLAUDE_MAX_CONCURRENCY", "3")))
+
+
+# Limits how many `claude` CLI processes run at once. Firing all 7 tones
+# simultaneously makes the CLIs race on the shared login token, so some lose
+# and exit with "Not logged in". Created lazily so it binds to the running
+# event loop.
+_semaphore: Optional[asyncio.Semaphore] = None
+
+
+def _get_semaphore() -> asyncio.Semaphore:
+    global _semaphore
+    if _semaphore is None:
+        _semaphore = asyncio.Semaphore(_max_concurrency())
+    return _semaphore
+
+
 def _build_prompt(
     shared_prompt: str,
     tone: dict,
@@ -44,45 +62,88 @@ def _build_prompt(
     )
 
 
-async def _call_claude(prompt: str, label: str) -> str:
+class _TransientCLIError(RuntimeError):
+    """A CLI failure worth retrying — e.g. the concurrent-login token race that
+    makes the CLI print "Not logged in" and exit 1."""
+
+
+def _max_retries() -> int:
+    return max(0, int(os.getenv("CLAUDE_MAX_RETRIES", "2")))
+
+
+def _is_transient(detail: str) -> bool:
+    return "not logged in" in detail.lower()
+
+
+async def _call_claude_once(prompt: str, label: str) -> str:
     """Run the Claude CLI once and return the stripped stdout text.
 
-    Raises RuntimeError on timeout or non-zero exit. `label` is only used to
-    make error messages legible (e.g. "tone 'curious'" or "summary").
+    Raises _TransientCLIError on a retryable failure, RuntimeError otherwise.
+    `label` is only used to make error messages legible.
     """
     timeout = _timeout_s()
 
     # Run from a neutral cwd so the CLI does not load this project's CLAUDE.md
     # as context.
-    proc = await asyncio.create_subprocess_exec(
-        _cli_path(),
-        "-p",
-        prompt,
-        "--model",
-        _model(),
-        cwd=tempfile.gettempdir(),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    try:
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=timeout
+    async with _get_semaphore():
+        proc = await asyncio.create_subprocess_exec(
+            _cli_path(),
+            "-p",
+            prompt,
+            "--model",
+            _model(),
+            cwd=tempfile.gettempdir(),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
-        raise RuntimeError(f"claude CLI timed out after {timeout}s for {label}")
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(), timeout=timeout
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            raise RuntimeError(f"claude CLI timed out after {timeout}s for {label}")
 
+    out = stdout.decode("utf-8", errors="replace").strip()
     if proc.returncode != 0:
         err = stderr.decode("utf-8", errors="replace").strip()
-        raise RuntimeError(
-            f"claude CLI exited with code {proc.returncode} for {label}: {err}"
-        )
+        # The CLI often reports failures (e.g. "Not logged in") on stdout, not
+        # stderr — fall back to stdout so the message isn't blank.
+        detail = err or out or "(no output)"
+        msg = f"claude CLI exited with code {proc.returncode} for {label}: {detail}"
+        raise _TransientCLIError(msg) if _is_transient(detail) else RuntimeError(msg)
 
-    text = stdout.decode("utf-8", errors="replace").strip()
+    text = out
     if text.startswith('"') and text.endswith('"') and len(text) > 1:
         text = text[1:-1].strip()
     return text
+
+
+async def _call_claude(prompt: str, label: str) -> str:
+    """Run the Claude CLI with retries on transient failures.
+
+    The concurrent-login token race is transient: a brief backoff and retry
+    almost always succeeds. Non-transient failures raise immediately.
+    """
+    retries = _max_retries()
+    for attempt in range(retries + 1):
+        try:
+            return await _call_claude_once(prompt, label)
+        except _TransientCLIError:
+            if attempt >= retries:
+                raise
+            backoff = 0.5 * (2 ** attempt)
+            logger.warning(
+                "Transient claude CLI failure for %s (attempt %d/%d), retrying in %.1fs",
+                label,
+                attempt + 1,
+                retries + 1,
+                backoff,
+            )
+            await asyncio.sleep(backoff)
+    # Unreachable: the loop either returns or raises.
+    raise RuntimeError(f"claude CLI retries exhausted for {label}")
 
 
 async def _generate_one(
