@@ -185,6 +185,24 @@
                 {% endif %}
             </p>
         {% else %}
+        {# Build the set of first-letters present (digits/symbols bucket under '#'). #}
+        {% set alphabet = ['#'] + ('ABCDEFGHIJKLMNOPQRSTUVWXYZ' | list) %}
+        {% set present = namespace(letters=[]) %}
+        {% for h in handles %}
+            {% set L = h.linkedin_handle[0] | upper %}
+            {% if L < 'A' or L > 'Z' %}{% set L = '#' %}{% endif %}
+            {% if L not in present.letters %}{% set present.letters = present.letters + [L] %}{% endif %}
+        {% endfor %}
+        <nav class="alpha-bar" aria-label="Jump to handle by first letter">
+            {% for L in alphabet %}
+                {% if L in present.letters %}
+                <a href="#alpha-{{ 'hash' if L == '#' else L }}" data-alpha-link>{{ L }}</a>
+                {% else %}
+                <span class="disabled">{{ L }}</span>
+                {% endif %}
+            {% endfor %}
+        </nav>
+        {% set grp = namespace(prev='') %}
         <table>
             <thead>
                 <tr>
@@ -202,7 +220,11 @@
             </thead>
             <tbody>
                 {% for h in handles %}
-                <tr class="handle-row freshness-{{ h.freshness }} {% if not h.active %}inactive{% endif %} {% if h.is_new %}recently-added{% endif %}">
+                {% set L = h.linkedin_handle[0] | upper %}
+                {% if L < 'A' or L > 'Z' %}{% set L = '#' %}{% endif %}
+                {% set is_first = L != grp.prev %}
+                {% set grp.prev = L %}
+                <tr {% if is_first %}id="alpha-{{ 'hash' if L == '#' else L }}"{% endif %} class="handle-row freshness-{{ h.freshness }} {% if not h.active %}inactive{% endif %} {% if h.is_new %}recently-added{% endif %}">
                     {% if edit_id == h.id %}
                         <td>{{ h.linkedin_handle }}</td>
                         <td colspan="9">
@@ -304,6 +326,18 @@
                    'Show all', 'Show active only');
         bindToggle('recent-only-toggle', 'recent-only', 'handles-recent-only',
                    'Show all (clear ≤24h)', 'Show new (≤24h)');
+
+        // A–Z scrubber: smooth-scroll to the first row of the chosen letter.
+        list.querySelectorAll('.alpha-bar a[data-alpha-link]').forEach(function (link) {
+            link.addEventListener('click', function (e) {
+                e.preventDefault();
+                var target = document.getElementById(link.getAttribute('href').slice(1));
+                if (!target) return;
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                target.classList.add('alpha-flash');
+                setTimeout(function () { target.classList.remove('alpha-flash'); }, 1200);
+            });
+        });
     })();
     </script>
 </div>
