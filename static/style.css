@@ -184,7 +184,12 @@ td.stale { color: var(--warn); font-weight: 500; }
     margin-bottom: 1.5rem;
 }
 .agent-status h2 { margin-top: 0; }
-.agent-controls { display: flex; align-items: center; gap: 0.75rem; }
+.agent-controls { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+/* Thin rule separating the run/tag actions from the roster picker. */
+.control-divider { width: 1px; align-self: stretch; margin: 0.1rem 0.15rem; background: var(--border, #ddd); }
+/* Select and its button read as one control rather than two loose ones. */
+.roster-form { display: inline-flex; align-items: center; gap: 0.35rem; }
+.roster-form select { padding: 0.3rem 0.4rem; font-size: 0.9rem; }
 button.run-now { background: #2a8a3e; }
 button.run-now:hover { background: #1f6b30; }
 button[disabled] { opacity: 0.6; cursor: progress; }

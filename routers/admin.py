@@ -15,12 +15,13 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 templates = Jinja2Templates(directory="templates")
 
 HANDLE_RE = re.compile(r"^[a-zA-Z0-9-]{1,100}$")
-DIMENSIONS = ("persona", "reach", "intent", "cadence")
+DIMENSIONS = ("persona", "reach", "intent", "cadence", "roster")
 DIMENSION_LABELS = {
     "persona": "Persona",
     "reach": "Reach",
     "intent": "Intent",
     "cadence": "Cadence",
+    "roster": "Roster",
 }
 
 
@@ -535,6 +536,84 @@ async def deactivate_all(request: Request, selected_tags: str = Form("")):
         else "Nothing to do — no active handles."
     )
     return await _render(request, full_page=False, flash=msg, selected_tags=sel)
+
+
+@router.post("/handles/apply-roster", response_class=HTMLResponse)
+async def apply_roster(
+    request: Request,
+    tag_id: str = Form(""),
+    selected_tags: str = Form(""),
+):
+    """Activate exactly the handles on a roster tag, deactivating everything
+    else. This is the saved version of the manual activate/deactivate pass, so
+    the next fetch picks up precisely that day's list."""
+    sel = _parse_tag_param(selected_tags)
+    if not tag_id.isdigit():
+        return await _render(
+            request, full_page=False, error="Pick a roster first.", selected_tags=sel
+        )
+    tid = int(tag_id)
+
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT label FROM tags "
+            "WHERE id = ? AND dimension = 'roster' AND deleted_at IS NULL",
+            (tid,),
+        )
+        tag = await cur.fetchone()
+        if not tag:
+            return await _render(
+                request,
+                full_page=False,
+                error="That roster no longer exists.",
+                selected_tags=sel,
+            )
+
+        # Refuse on an empty roster: applying it would silently deactivate
+        # every handle and the next fetch would return nothing.
+        cur = await db.execute(
+            "SELECT COUNT(*) FROM handle_tags ht "
+            "JOIN handles h ON h.id = ht.handle_id "
+            "WHERE ht.tag_id = ? AND h.deleted_at IS NULL",
+            (tid,),
+        )
+        members = (await cur.fetchone())[0]
+        if not members:
+            return await _render(
+                request,
+                full_page=False,
+                error=(
+                    f"Roster “{tag['label']}” has no handles yet. "
+                    f"Tag some handles with it first."
+                ),
+                selected_tags=sel,
+            )
+
+        cur = await db.execute(
+            "UPDATE handles SET active = 1 "
+            "WHERE deleted_at IS NULL AND active = 0 "
+            "AND id IN (SELECT handle_id FROM handle_tags WHERE tag_id = ?)",
+            (tid,),
+        )
+        activated = cur.rowcount
+        cur = await db.execute(
+            "UPDATE handles SET active = 0 "
+            "WHERE deleted_at IS NULL AND active = 1 "
+            "AND id NOT IN (SELECT handle_id FROM handle_tags WHERE tag_id = ?)",
+            (tid,),
+        )
+        deactivated = cur.rowcount
+        await db.commit()
+
+    return await _render(
+        request,
+        full_page=False,
+        flash=(
+            f"Applied roster “{tag['label']}”: {members} handle(s) now active "
+            f"({activated} switched on, {deactivated} switched off)."
+        ),
+        selected_tags=sel,
+    )
 
 
 @router.post("/handles/activate-recommended", response_class=HTMLResponse)

@@ -15,7 +15,7 @@
             <span id="run-spinner" class="htmx-indicator">Fetching… (this can take a minute per handle)</span>
             <form hx-post="/admin/auto-tag" hx-target="#admin-main" hx-swap="outerHTML"
                   hx-confirm="Run profile enrichment over handles that currently have no tags? This calls Apify once per handle and Claude once per handle for persona tagging."
-                  style="display:inline; margin-left: 0.5rem;">
+                  style="display:inline;">
                 <input type="hidden" name="selected_tags" value="{{ selected_tags_param }}">
                 <button type="submit"
                         hx-disabled-elt="this"
@@ -26,12 +26,28 @@
             <span id="autotag-spinner" class="htmx-indicator">Enriching… (this takes ~30s per handle)</span>
             <form hx-post="/admin/handles/deactivate-all" hx-target="#admin-main" hx-swap="outerHTML"
                   hx-confirm="Deactivate ALL active handles? They will be excluded from the daily 6am fetch until you re-activate them."
-                  style="display:inline; margin-left: 0.5rem;">
+                  style="display:inline;">
                 <input type="hidden" name="selected_tags" value="{{ selected_tags_param }}">
                 <button type="submit"
                         class="btn-danger"
                         title="Set every active handle to inactive (preserves tags, notes, history)">Deactivate all</button>
             </form>
+            {% if all_tags_grouped.roster %}
+            <span class="control-divider" aria-hidden="true"></span>
+            <form hx-post="/admin/handles/apply-roster" hx-target="#admin-main" hx-swap="outerHTML"
+                  hx-confirm="Apply this roster? It activates exactly that roster's handles and deactivates every other handle."
+                  class="roster-form">
+                <input type="hidden" name="selected_tags" value="{{ selected_tags_param }}">
+                <select name="tag_id" aria-label="Roster to apply">
+                    {% for t in all_tags_grouped.roster %}
+                    <option value="{{ t.id }}">{{ t.label }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit"
+                        class="btn-secondary"
+                        title="Activate exactly this roster's handles, deactivating all others">Apply</button>
+            </form>
+            {% endif %}
         </div>
         {% if last_run %}
         <div class="last-run">
@@ -305,6 +321,28 @@
     </section>
     <script>
     (function () {
+        // Every control in here swaps the whole #admin-main fragment, which
+        // destroys the button the user just clicked. With the focused element
+        // gone the browser drops the scroll position and lands at the foot of
+        // the (very long) handles table. Restore it: show the row being edited
+        // if there is one, otherwise put the viewport back where it was.
+        // Guarded because this script re-runs on every swap.
+        if (!window.__adminScrollRestore) {
+            window.__adminScrollRestore = true;
+            var savedScroll = null;
+            document.addEventListener('htmx:beforeSwap', function () {
+                savedScroll = window.scrollY;
+            });
+            document.addEventListener('htmx:afterSwap', function () {
+                var editing = document.querySelector('.handle-edit-form');
+                if (editing) {
+                    editing.scrollIntoView({ block: 'center' });
+                } else if (savedScroll !== null) {
+                    window.scrollTo(0, savedScroll);
+                }
+            });
+        }
+
         var list = document.querySelector('.handles-list');
         if (!list) return;
         function bindToggle(btnId, listClass, storageKey, onLabel, offLabel) {

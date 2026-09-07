@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     slug TEXT UNIQUE NOT NULL,
     label TEXT NOT NULL,
-    dimension TEXT NOT NULL CHECK(dimension IN ('persona','reach','intent','cadence')),
+    dimension TEXT NOT NULL CHECK(dimension IN ('persona','reach','intent','cadence','roster')),
     description TEXT,
     sort_order INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
@@ -139,6 +139,15 @@ SEED_TAGS = [
     ("cadence-daily", "Daily", "cadence", "Posts daily", 10),
     ("cadence-weekly", "Weekly", "cadence", "Posts roughly weekly", 20),
     ("cadence-sporadic", "Sporadic", "cadence", "Posts occasionally", 30),
+    # Roster — which handles you engage with on a given day. Applying a roster
+    # activates exactly its members, so these drive who the fetch picks up.
+    ("roster-monday", "Monday", "roster", "Engage with these on Mondays", 10),
+    ("roster-tuesday", "Tuesday", "roster", "Engage with these on Tuesdays", 20),
+    ("roster-wednesday", "Wednesday", "roster", "Engage with these on Wednesdays", 30),
+    ("roster-thursday", "Thursday", "roster", "Engage with these on Thursdays", 40),
+    ("roster-friday", "Friday", "roster", "Engage with these on Fridays", 50),
+    ("roster-saturday", "Saturday", "roster", "Engage with these on Saturdays", 60),
+    ("roster-sunday", "Sunday", "roster", "Engage with these on Sundays", 70),
 ]
 
 
@@ -187,6 +196,55 @@ async def _migrate(db: aiosqlite.Connection) -> None:
         await db.execute("ALTER TABLE posted_log ADD COLUMN rating INTEGER")
     if "rated_at" not in cols:
         await db.execute("ALTER TABLE posted_log ADD COLUMN rated_at TEXT")
+
+    await _migrate_tag_dimensions(db)
+
+
+async def _migrate_tag_dimensions(db: aiosqlite.Connection) -> None:
+    """Widen the tags.dimension CHECK constraint when a dimension is added.
+
+    SQLite cannot alter a CHECK in place, so the table is rebuilt. Row ids are
+    carried over, which keeps handle_tags rows pointing at the right tags. The
+    rebuild runs with foreign keys off so dropping the old table does not
+    cascade-delete those rows.
+    """
+    cur = await db.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tags'"
+    )
+    row = await cur.fetchone()
+    if not row or "'roster'" in row[0]:
+        return
+
+    # PRAGMA foreign_keys is a no-op inside a transaction, so settle first.
+    await db.commit()
+    await db.execute("PRAGMA foreign_keys = OFF")
+    try:
+        await db.execute(
+            """
+            CREATE TABLE tags_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                slug TEXT UNIQUE NOT NULL,
+                label TEXT NOT NULL,
+                dimension TEXT NOT NULL CHECK(dimension IN
+                    ('persona','reach','intent','cadence','roster')),
+                description TEXT,
+                sort_order INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now')),
+                deleted_at TEXT
+            )
+            """
+        )
+        await db.execute(
+            "INSERT INTO tags_new "
+            "(id, slug, label, dimension, description, sort_order, created_at, deleted_at) "
+            "SELECT id, slug, label, dimension, description, sort_order, created_at, deleted_at "
+            "FROM tags"
+        )
+        await db.execute("DROP TABLE tags")
+        await db.execute("ALTER TABLE tags_new RENAME TO tags")
+        await db.commit()
+    finally:
+        await db.execute("PRAGMA foreign_keys = ON")
 
 
 async def _seed_tags(db: aiosqlite.Connection) -> None:
