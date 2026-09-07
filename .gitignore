@@ -22,3 +22,7 @@ logs/
 
 # Local masterclass / scratch HTML — not part of the app
 LI_Comments_Masterclass.html
+
+# Local backups made before migrations/config edits (may contain secrets)
+.env.bak*
+*.db.bak*

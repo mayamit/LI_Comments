@@ -10,12 +10,13 @@ from database import get_db
 router = APIRouter(prefix="/admin/tags", tags=["tags"])
 templates = Jinja2Templates(directory="templates")
 
-DIMENSIONS = ("persona", "reach", "intent", "cadence")
+DIMENSIONS = ("persona", "reach", "intent", "cadence", "roster")
 DIMENSION_LABELS = {
     "persona": "Persona",
     "reach": "Reach",
     "intent": "Intent",
     "cadence": "Cadence",
+    "roster": "Roster",
 }
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,60}$")
 
