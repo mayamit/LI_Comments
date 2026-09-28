@@ -4,7 +4,7 @@ import logging
 import os
 import unicodedata
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 import httpx
 
@@ -237,24 +237,32 @@ async def _now_iso() -> str:
         return row[0]
 
 
-async def run_fetch(trigger: str = "manual") -> dict:
+async def run_fetch(
+    trigger: str = "manual", only_handles: Optional[List[str]] = None
+) -> dict:
     """Run the fetch agent over all active handles.
 
     Sequential per AC. Per-handle errors are captured and don't abort the run.
     Returns a summary dict. If another run is in progress, returns
     {"skipped": True, "reason": "..."}.
+
+    `only_handles` limits the run to those linkedin_handles regardless of their
+    active flag — for retrying handles that failed transiently (a DNS blip
+    reaching Apify, say) without disturbing the active set.
     """
     global _running
     if _running:
         return {"skipped": True, "reason": "A fetch run is already in progress."}
     _running = True
     try:
-        return await _run_fetch_inner(trigger)
+        return await _run_fetch_inner(trigger, only_handles)
     finally:
         _running = False
 
 
-async def _run_fetch_inner(trigger: str) -> dict:
+async def _run_fetch_inner(
+    trigger: str, only_handles: Optional[List[str]] = None
+) -> dict:
     # local imports avoid circulars at boot
     from comments import generate_for_post, generate_summary_for_post
 
@@ -279,10 +287,21 @@ async def _run_fetch_inner(trigger: str) -> dict:
         await db.commit()
 
     async with get_db() as db:
-        cur = await db.execute(
-            "SELECT id, linkedin_handle FROM handles "
-            "WHERE active = 1 AND deleted_at IS NULL ORDER BY id"
-        )
+        if only_handles:
+            # Retrying named handles (e.g. after a transient network failure),
+            # so ignore the active flag — the caller asked for these by name.
+            placeholders = ",".join("?" * len(only_handles))
+            cur = await db.execute(
+                f"SELECT id, linkedin_handle FROM handles "
+                f"WHERE linkedin_handle IN ({placeholders}) "
+                f"AND deleted_at IS NULL ORDER BY id",
+                only_handles,
+            )
+        else:
+            cur = await db.execute(
+                "SELECT id, linkedin_handle FROM handles "
+                "WHERE active = 1 AND deleted_at IS NULL ORDER BY id"
+            )
         handles = [dict(r) for r in await cur.fetchall()]
 
     for h in handles:
