@@ -21,6 +21,7 @@ LI_Comments/
 ├── agent.py                 # Fetch + generate pipeline (Apify → Claude)
 ├── discover.py              # Trending post discovery (Apify post-search → rank → Claude)
 ├── backfill.py              # Regenerate comments for posts that have none (CLI-logout recovery)
+├── maintenance.py           # Retention: archive + prune posts older than RETENTION_DAYS
 ├── tones.yaml               # All tone prompt templates (single source of truth)
 ├── tones.py                 # Loads/saves tones.yaml; tone helpers
 ├── routers/
@@ -147,6 +148,11 @@ DISCOVERY_SCHEDULE_ENABLED=0 # set 1 to enable a scheduled daily discovery run
 DISCOVERY_SCHEDULE_HOUR=7    # 24h, default 7am
 DISCOVERY_SCHEDULE_MINUTE=0
 DATABASE_PATH=./li_comments.db
+RETENTION_DAYS=15            # posts older than this are archived + pruned
+ARCHIVE_DATABASE_PATH=       # default: <DATABASE_PATH>_archive.db
+MAINTENANCE_SCHEDULE_ENABLED=1  # daily retention run (local-only, on by default)
+MAINTENANCE_SCHEDULE_HOUR=5
+MAINTENANCE_SCHEDULE_MINUTE=30
 LOG_LEVEL=INFO
 LOG_DIR=./logs
 ```
@@ -158,6 +164,7 @@ LOG_DIR=./logs
 - **Tag dimensions** — adding one means widening the `tags.dimension` CHECK (via a table rebuild) *and* updating `DIMENSIONS`/`DIMENSION_LABELS` in both routers
 - **HTMX over JavaScript** — prefer HTMX attributes for dynamic UI (inline edit, copy button, status filters) over writing custom JS
 - **No ORMs** — use raw SQL via `sqlite3`/`aiosqlite` to keep the dependency footprint minimal
+- **Retention** — `maintenance.py` never deletes `posts` rows (dedup on `post_id` and `/history` depend on them). Past `RETENTION_DAYS` it auto-dismisses unreviewed posts, moves unposted `generated_comments` to the archive DB, and slims `engagement_json` to `{reactions, comments, reposts, images}`. Don't store raw Apify items or profiles in the main DB.
 - **Errors don't abort runs** — if Apify or Claude fails for one handle/tone, log it and continue; never let one failure kill the whole agent run
 
 ## External Services

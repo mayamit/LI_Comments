@@ -189,6 +189,14 @@ async def _migrate(db: aiosqlite.Connection) -> None:
         await db.execute("ALTER TABLE posts ADD COLUMN author_name TEXT")
     # Index created here (not in SCHEMA) so it runs after the source column exists.
     await db.execute("CREATE INDEX IF NOT EXISTS idx_posts_source ON posts(source)")
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_posts_fetched_at ON posts(fetched_at)")
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_generated_comments_post ON generated_comments(post_id)"
+    )
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_posted_log_post ON posted_log(post_id)")
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_posted_log_comment ON posted_log(comment_id)"
+    )
 
     cur = await db.execute("PRAGMA table_info(posted_log)")
     cols = [r[1] for r in await cur.fetchall()]
@@ -291,6 +299,9 @@ async def _seed_discovery_topics(db: aiosqlite.Connection) -> None:
 
 async def init_db() -> None:
     async with aiosqlite.connect(db_path()) as db:
+        # Only takes effect on a brand-new file; an existing database switches
+        # over via `python maintenance.py --vacuum`.
+        await db.execute("PRAGMA auto_vacuum = INCREMENTAL")
         await db.executescript(SCHEMA)
         await _migrate(db)
         await _seed_tags(db)

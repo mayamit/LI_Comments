@@ -21,6 +21,7 @@ load_dotenv()
 from comments import generate_for_post, generate_summary_for_post  # noqa: E402
 from database import get_db, init_db  # noqa: E402
 from logging_setup import setup_logging  # noqa: E402
+from maintenance import cutoff_modifier  # noqa: E402
 
 logger = logging.getLogger("backfill")
 
@@ -33,11 +34,13 @@ async def _posts_missing_comments(status: str) -> list[dict]:
         "LEFT JOIN handles h ON p.handle_id = h.id "
         "LEFT JOIN generated_comments g ON g.post_id = p.id "
         "WHERE g.id IS NULL AND p.status != 'posted' "
+        # Past retention, maintenance deletes unposted comments on purpose.
+        "AND p.fetched_at >= datetime('now', ?) "
     )
-    params: tuple = ()
+    params: tuple = (cutoff_modifier(),)
     if status != "any":
         sql += "AND p.status = ? "
-        params = (status,)
+        params += (status,)
     sql += "ORDER BY p.id"
     async with get_db() as db:
         cur = await db.execute(sql, params)

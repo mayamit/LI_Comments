@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 import tones as tones_store
 from comments import generate_for_post, regenerate_one_tone
 from database import get_db
-from utils import relative_time, truncate
+from utils import extract_post_images, relative_time, truncate
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 templates = Jinja2Templates(directory="templates")
@@ -38,24 +38,17 @@ def _parse_engagement(raw: Optional[str]) -> dict:
 
 
 def _parse_images(raw: Optional[str]) -> list[dict]:
-    """Pull post image URLs out of the stored Apify response."""
+    """Pull post image URLs out of the stored engagement blob. Older rows keep
+    the full Apify item under "raw"; newer and pruned rows store "images"."""
     if not raw:
         return []
     try:
         data = json.loads(raw)
     except (json.JSONDecodeError, TypeError):
         return []
-    item = data.get("raw") or {}
-    imgs = item.get("postImages") or []
-    out = []
-    for img in imgs:
-        if isinstance(img, dict):
-            url = img.get("url")
-            if isinstance(url, str) and url.startswith("http"):
-                out.append(
-                    {"url": url, "width": img.get("width"), "height": img.get("height")}
-                )
-    return out
+    if "images" in data:
+        return data["images"] or []
+    return extract_post_images(data.get("raw") or {})
 
 
 async def _fetch_status_counts() -> dict:

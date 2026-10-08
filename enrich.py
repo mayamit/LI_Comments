@@ -317,9 +317,11 @@ async def enrich_handle(handle_id: int, handle_name: str) -> dict:
 
     async with get_db() as db:
         await db.execute(
-            "UPDATE handles SET enrichment_json = ?, enriched_at = datetime('now'), "
+            # The raw profile isn't stored: nothing reads it, and at ~35 KB a
+            # handle it was a large share of the database.
+            "UPDATE handles SET enriched_at = datetime('now'), "
             "display_name = COALESCE(?, display_name) WHERE id = ?",
-            (json.dumps(profile, default=str), display_name, handle_id),
+            (display_name, handle_id),
         )
         await db.commit()
 

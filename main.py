@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from agent import run_fetch
 from database import init_db
 from discover import run_discovery
+from maintenance import run_maintenance
 from logging_setup import install_asyncio_exception_handler, setup_logging
 from routers import admin
 from routers import dashboard
@@ -103,6 +104,22 @@ async def lifespan(app: FastAPI):
         )
         logging.getLogger(__name__).info(
             "Scheduler — daily discovery at %02d:%02d", d_hour, d_minute
+        )
+
+    # Retention (archive + prune old posts). Local-only and cheap, so on by default.
+    if os.getenv("MAINTENANCE_SCHEDULE_ENABLED", "1").lower() in ("1", "true", "yes", "on"):
+        m_hour = int(os.getenv("MAINTENANCE_SCHEDULE_HOUR", "5"))
+        m_minute = int(os.getenv("MAINTENANCE_SCHEDULE_MINUTE", "30"))
+        scheduler.add_job(
+            run_maintenance,
+            CronTrigger(hour=m_hour, minute=m_minute),
+            id="daily_maintenance",
+            max_instances=1,
+            coalesce=True,
+            replace_existing=True,
+        )
+        logging.getLogger(__name__).info(
+            "Scheduler — daily maintenance at %02d:%02d", m_hour, m_minute
         )
 
     scheduler.start()

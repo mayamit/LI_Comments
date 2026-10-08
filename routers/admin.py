@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -9,7 +10,10 @@ from fastapi.templating import Jinja2Templates
 from agent import get_last_run, run_fetch
 from database import get_db
 from enrich import enrich_untagged_handles
+from maintenance import run_maintenance
 from utils import relative_time as _relative_time
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 templates = Jinja2Templates(directory="templates")
@@ -506,6 +510,25 @@ async def auto_tag(request: Request, selected_tags: str = Form("")):
     if failures:
         first = failures[0]
         msg += f" First error: @{first.get('handle')}: {first.get('error')}"
+    return await _render(request, full_page=False, flash=msg, selected_tags=sel)
+
+
+@router.post("/maintenance", response_class=HTMLResponse)
+async def maintenance(request: Request, selected_tags: str = Form("")):
+    sel = _parse_tag_param(selected_tags)
+    try:
+        s = await run_maintenance()
+    except Exception as e:
+        logger.exception("Maintenance failed")
+        return await _render(request, full_page=False, error=f"Maintenance failed: {e}", selected_tags=sel)
+    if s.get("skipped"):
+        return await _render(request, full_page=False, error=s["reason"], selected_tags=sel)
+    msg = (
+        f"Maintenance complete — posts older than {s['retention_days']} days: "
+        f"{s['dismissed']} auto-dismissed, {s['comments_dropped']} unposted comments archived, "
+        f"{s['posts_slimmed']} posts slimmed; {s['profiles_cleared']} handle profiles archived. "
+        f"DB {s['size_before'] / 1_048_576:.1f} MB → {s['size_after'] / 1_048_576:.1f} MB."
+    )
     return await _render(request, full_page=False, flash=msg, selected_tags=sel)
 
 

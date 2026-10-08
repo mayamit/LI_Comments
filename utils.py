@@ -33,3 +33,15 @@ def truncate(text: Optional[str], limit: int = 300) -> str:
     if len(text) <= limit:
         return text
     return text[:limit].rstrip() + "…"
+
+
+def extract_post_images(item: dict) -> list[dict]:
+    """Post image URLs from an Apify post item — the only part of the raw item
+    the app displays, so it is all that gets stored alongside the counts."""
+    out = []
+    for img in item.get("postImages") or []:
+        if isinstance(img, dict):
+            url = img.get("url")
+            if isinstance(url, str) and url.startswith("http"):
+                out.append({"url": url, "width": img.get("width"), "height": img.get("height")})
+    return out

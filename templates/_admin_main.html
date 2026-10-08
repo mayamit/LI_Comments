@@ -24,6 +24,15 @@
                         title="For handles with no tags yet: fetch profile data, set reach/cadence/persona tags, refresh display names">Auto-tag untagged</button>
             </form>
             <span id="autotag-spinner" class="htmx-indicator">Enriching… (this takes ~30s per handle)</span>
+            <form hx-post="/admin/maintenance" hx-target="#admin-main" hx-swap="outerHTML"
+                  hx-confirm="Archive old data? Posts older than the retention window keep their row, but unposted comments and raw post data move to the archive file, and old unreviewed posts are dismissed."
+                  style="display:inline;">
+                <input type="hidden" name="selected_tags" value="{{ selected_tags_param }}">
+                <button type="submit"
+                        hx-disabled-elt="this"
+                        class="btn-secondary"
+                        title="Archive and prune posts older than RETENTION_DAYS (runs daily automatically)">Archive old data</button>
+            </form>
             <form hx-post="/admin/handles/deactivate-all" hx-target="#admin-main" hx-swap="outerHTML"
                   hx-confirm="Deactivate ALL active handles? They will be excluded from the daily 6am fetch until you re-activate them."
                   style="display:inline;">

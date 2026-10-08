@@ -9,6 +9,7 @@ from typing import Any, List, Optional
 import httpx
 
 from database import get_db
+from utils import extract_post_images
 
 logger = logging.getLogger(__name__)
 
@@ -208,7 +209,7 @@ async def _insert_post_if_new(handle_id: int, post_id: str, item: dict) -> Optio
                 "reposts": _to_int(item.get("repostsCount"))
                 or _to_int(item.get("reposts"))
                 or _to_int(item.get("numReposts")),
-                "raw": item,
+                "images": extract_post_images(item),
             },
             default=str,
         )

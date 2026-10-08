@@ -26,6 +26,7 @@ from agent import (
     _to_int,
 )
 from database import get_db
+from utils import extract_post_images
 
 logger = logging.getLogger(__name__)
 
@@ -196,7 +197,7 @@ async def _insert_trending_post_if_new(item: dict) -> Optional[int]:
         posted_at = _extract_posted_at(item)
         author = _extract_author(item)
         eng = _extract_engagement(item)
-        engagement_json = json.dumps({**eng, "raw": item}, default=str)
+        engagement_json = json.dumps({**eng, "images": extract_post_images(item)})
         cur = await db.execute(
             "INSERT INTO posts (handle_id, post_id, content, url, engagement_json, "
             "posted_at, source, engagement_score, author_handle, author_name) "
