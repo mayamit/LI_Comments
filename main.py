@@ -108,7 +108,7 @@ async def lifespan(app: FastAPI):
 
     # Retention (archive + prune old posts). Local-only and cheap, so on by default.
     if os.getenv("MAINTENANCE_SCHEDULE_ENABLED", "1").lower() in ("1", "true", "yes", "on"):
-        m_hour = int(os.getenv("MAINTENANCE_SCHEDULE_HOUR", "5"))
+        m_hour = int(os.getenv("MAINTENANCE_SCHEDULE_HOUR", "9"))
         m_minute = int(os.getenv("MAINTENANCE_SCHEDULE_MINUTE", "30"))
         scheduler.add_job(
             run_maintenance,
