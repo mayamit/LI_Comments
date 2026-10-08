@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -6,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from comments import generate_for_post
-from database import get_db
+from database import get_db, unmark_posted
 from discover import (
     DiscoveryError,
     _keep_top_n,
@@ -19,7 +18,13 @@ from discover import (
     run_discovery,
     toggle_topic,
 )
-from routers.dashboard import _fetch_posts, _post_status, _set_status_if
+from routers.dashboard import (
+    UNDO_WINDOW_S,
+    _fetch_posts,
+    _post_status,
+    _posted_detail,
+    _set_status_if,
+)
 
 WINDOW_OPTIONS = ["24h", "week", "month", "3months", "6months", "year", "any"]
 
@@ -34,6 +39,7 @@ async def _render(
     flash: Optional[str] = None,
     error: Optional[str] = None,
     undo_log_id: Optional[int] = None,
+    undo_detail: Optional[str] = None,
 ):
     # Trending posts are ranked by engagement, not recency.
     posts = await _fetch_posts("all", source="trending", order="engagement")
@@ -52,6 +58,7 @@ async def _render(
         "flash": flash,
         "error": error,
         "undo_log_id": undo_log_id,
+        "undo_detail": undo_detail,
     }
     template = "discover.html" if full_page else "_discover_main.html"
     return templates.TemplateResponse(request, template, ctx)
@@ -147,7 +154,7 @@ async def regenerate_all(request: Request, post_id: int):
 
 
 @router.post("/posts/{post_id}/comments/{tone_key}/mark-posted", response_class=HTMLResponse)
-async def mark_posted(request: Request, post_id: int, tone_key: str):
+async def mark_posted(request: Request, post_id: int, tone_key: str, via: str = Form("")):
     async with get_db() as db:
         cur = await db.execute(
             "SELECT id FROM generated_comments WHERE post_id = ? AND tone = ?",
@@ -167,30 +174,14 @@ async def mark_posted(request: Request, post_id: int, tone_key: str):
         log_id = cur.lastrowid
         await db.execute("UPDATE posts SET status = 'posted' WHERE id = ?", (post_id,))
         await db.commit()
-    return await _render(request, full_page=False, undo_log_id=log_id)
+    detail = await _posted_detail(post_id, tone_key) if via == "copy-comment" else None
+    return await _render(request, full_page=False, undo_log_id=log_id, undo_detail=detail)
 
 
 @router.post("/posted/{log_id}/undo", response_class=HTMLResponse)
 async def undo_mark_posted(request: Request, log_id: int):
-    async with get_db() as db:
-        cur = await db.execute(
-            "SELECT post_id, posted_at FROM posted_log WHERE id = ?", (log_id,)
-        )
-        row = await cur.fetchone()
-    if not row:
-        return await _render(request, full_page=False, error="Already undone or expired.")
-    try:
-        posted_at = datetime.fromisoformat(row["posted_at"].replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
-        posted_at = datetime.now(timezone.utc)
-    if posted_at.tzinfo is None:
-        posted_at = posted_at.replace(tzinfo=timezone.utc)
-    if (datetime.now(timezone.utc) - posted_at).total_seconds() > 10:
-        return await _render(request, full_page=False, error="Undo window expired (10 seconds).")
-    async with get_db() as db:
-        await db.execute("DELETE FROM posted_log WHERE id = ?", (log_id,))
-        await db.execute(
-            "UPDATE posts SET status = 'reviewed' WHERE id = ?", (row["post_id"],)
-        )
-        await db.commit()
+    err = await unmark_posted(log_id, max_age_s=UNDO_WINDOW_S)
+    if err:
+        return await _render(request, full_page=False, error=err)
     return await _render(request, full_page=False, flash="Undone.")
+

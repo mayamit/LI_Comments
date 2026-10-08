@@ -98,13 +98,9 @@
                         class="btn-small edit">Edit</button>
                 <button onclick="liCopy(this, this.closest('.comment-block').querySelector('.comment-text'), {{ p.id }})"
                         class="btn-small copy">Copy</button>
-                {% if not tb.is_posted %}
-                <button hx-post="{{ base }}/posts/{{ p.id }}/comments/{{ tb.key }}/mark-posted"
-                        hx-target="#dashboard-main" hx-swap="outerHTML"
-                        hx-vals='{"status": "{{ active_status }}"}'
-                        {% if p.is_posted_status %}hx-confirm="Replace the previously-posted comment with this one?"{% endif %}
-                        class="btn-small mark-posted">Mark posted</button>
-                {% endif %}
+                {% with pid=p.id, tone_key=tb.key, url=p.url, is_posted=tb.is_posted, post_is_posted=p.is_posted_status %}
+                {% include "_comment_post_actions.html" %}
+                {% endwith %}
                 {% if p.can_regenerate %}
                 <button hx-post="/dashboard/posts/{{ p.id }}/comments/{{ tb.key }}/regenerate"
                         hx-target="#comment-{{ p.id }}-{{ tb.key }}" hx-swap="outerHTML"

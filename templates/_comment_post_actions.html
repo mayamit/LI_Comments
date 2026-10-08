@@ -1,0 +1,21 @@
+{# "Copy & comment" + "Mark posted" for one tone's comment.
+   Vars: pid, tone_key, url (LinkedIn post, may be empty), base ("/dashboard" | "/discover"),
+   is_posted (this tone is the posted one), post_is_posted (some tone is). #}
+{% set mark_url = base ~ "/posts/" ~ pid ~ "/comments/" ~ tone_key ~ "/mark-posted" %}
+{% set replace_msg = "Replace the previously-posted comment with this one?" %}
+{% if url %}
+<button type="button"
+        onclick="liCopyAndComment(this)"
+        data-post-url="{{ url }}"
+        {% if not is_posted %}data-mark-url="{{ mark_url }}"{% endif %}
+        {% if post_is_posted and not is_posted %}data-confirm="{{ replace_msg }}"{% endif %}
+        class="btn-small copy-comment"
+        title="{% if is_posted %}Copies this comment and opens the LinkedIn post (already marked posted){% else %}Copies this comment, opens the LinkedIn post, and marks it as posted{% endif %}">Copy &amp; comment ↗</button>
+{% endif %}
+{% if not is_posted %}
+<button hx-post="{{ mark_url }}"
+        hx-target="#dashboard-main" hx-swap="outerHTML"
+        hx-vals='js:{status: liActiveStatus()}'
+        {% if post_is_posted %}hx-confirm="{{ replace_msg }}"{% endif %}
+        class="btn-small mark-posted">Mark posted</button>
+{% endif %}

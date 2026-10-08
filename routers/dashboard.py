@@ -7,13 +7,15 @@ from fastapi.templating import Jinja2Templates
 
 import tones as tones_store
 from comments import generate_for_post, regenerate_one_tone
-from database import get_db
+from database import get_db, unmark_posted
 from utils import extract_post_images, relative_time, truncate
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 templates = Jinja2Templates(directory="templates")
 
 VALID_STATUSES = {"unreviewed", "reviewed", "posted", "dismissed"}
+# Long enough to come back from LinkedIn after "Copy & comment" and undo there.
+UNDO_WINDOW_S = 30 * 60
 STATUS_TABS = [
     ("all", "All"),
     ("unreviewed", "Unreviewed"),
@@ -200,6 +202,7 @@ async def _render_dashboard(
     flash: Optional[str] = None,
     error: Optional[str] = None,
     undo_log_id: Optional[int] = None,
+    undo_detail: Optional[str] = None,
 ):
     if status not in {"all", *VALID_STATUSES}:
         status = "unreviewed"
@@ -213,6 +216,7 @@ async def _render_dashboard(
         "flash": flash,
         "error": error,
         "undo_log_id": undo_log_id,
+        "undo_detail": undo_detail,
     }
     template = "dashboard.html" if full_page else "_dashboard_main.html"
     return templates.TemplateResponse(request, template, ctx)
@@ -238,6 +242,42 @@ def _tone_meta(tone_key: str) -> dict:
     return {"key": t["key"], "name": t["name"], "description": t.get("description") or ""}
 
 
+async def _post_context(post_id: int) -> dict:
+    """What a standalone comment block needs to render its post actions."""
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT p.url, p.source, p.status, "
+            "(SELECT tone FROM posted_log WHERE post_id = p.id) AS posted_tone "
+            "FROM posts p WHERE p.id = ?",
+            (post_id,),
+        )
+        row = await cur.fetchone()
+    if not row:
+        return {"url": None, "base": "/dashboard", "is_posted_status": False, "posted_tone": None}
+    return {
+        "url": row["url"],
+        # Trending posts are only shown on /discover; route actions back there.
+        "base": "/discover" if row["source"] == "trending" else "/dashboard",
+        "is_posted_status": row["status"] == "posted",
+        "posted_tone": row["posted_tone"],
+    }
+
+
+async def _posted_detail(post_id: int, tone_key: str) -> str:
+    """Undo-banner text naming what was just marked posted."""
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT COALESCE(h.display_name, p.author_name, h.linkedin_handle, "
+            "p.author_handle) AS name "
+            "FROM posts p LEFT JOIN handles h ON p.handle_id = h.id WHERE p.id = ?",
+            (post_id,),
+        )
+        row = await cur.fetchone()
+    # Display names often carry a headline ("Jane Doe — CEO at X"); keep the name.
+    name = ((row["name"] if row else None) or "this").split(" — ")[0].split(" - ")[0]
+    return f"Marked your {_tone_meta(tone_key)['name']} comment on {name}'s post as posted."
+
+
 async def _render_comment_block(
     request: Request,
     post_id: int,
@@ -255,6 +295,7 @@ async def _render_comment_block(
             "comment": comment,
             "editing": editing,
             "can_regenerate": can_regenerate,
+            "post": await _post_context(post_id),
         },
     )
 
@@ -374,7 +415,11 @@ async def comment_save(
 
 @router.post("/posts/{post_id}/comments/{tone_key}/mark-posted", response_class=HTMLResponse)
 async def mark_posted(
-    request: Request, post_id: int, tone_key: str, status: str = Form("unreviewed")
+    request: Request,
+    post_id: int,
+    tone_key: str,
+    status: str = Form("unreviewed"),
+    via: str = Form(""),
 ):
     async with get_db() as db:
         cur = await db.execute(
@@ -396,42 +441,19 @@ async def mark_posted(
         log_id = cur.lastrowid
         await db.execute("UPDATE posts SET status = 'posted' WHERE id = ?", (post_id,))
         await db.commit()
+    # "Copy & comment" sends you off to LinkedIn, so its undo banner names
+    # what was marked and stays up rather than counting down.
+    detail = await _posted_detail(post_id, tone_key) if via == "copy-comment" else None
     return await _render_dashboard(
-        request, full_page=False, status=status, undo_log_id=log_id,
+        request, full_page=False, status=status, undo_log_id=log_id, undo_detail=detail,
     )
 
 
 @router.post("/posted/{log_id}/undo", response_class=HTMLResponse)
 async def undo_mark_posted(request: Request, log_id: int, status: str = Form("unreviewed")):
-    async with get_db() as db:
-        cur = await db.execute(
-            "SELECT post_id, posted_at FROM posted_log WHERE id = ?", (log_id,)
-        )
-        row = await cur.fetchone()
-    if not row:
-        return await _render_dashboard(
-            request, full_page=False, status=status,
-            error="Already undone or expired.",
-        )
-    from datetime import datetime, timezone
-    try:
-        posted_at = datetime.fromisoformat(row["posted_at"].replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
-        posted_at = datetime.now(timezone.utc)
-    if posted_at.tzinfo is None:
-        posted_at = posted_at.replace(tzinfo=timezone.utc)
-    age_s = (datetime.now(timezone.utc) - posted_at).total_seconds()
-    if age_s > 10:
-        return await _render_dashboard(
-            request, full_page=False, status=status,
-            error="Undo window expired (10 seconds).",
-        )
-    async with get_db() as db:
-        await db.execute("DELETE FROM posted_log WHERE id = ?", (log_id,))
-        await db.execute(
-            "UPDATE posts SET status = 'reviewed' WHERE id = ?", (row["post_id"],)
-        )
-        await db.commit()
+    err = await unmark_posted(log_id, max_age_s=UNDO_WINDOW_S)
+    if err:
+        return await _render_dashboard(request, full_page=False, status=status, error=err)
     return await _render_dashboard(
         request, full_page=False, status=status, flash="Undone."
     )

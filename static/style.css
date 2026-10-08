@@ -572,6 +572,19 @@ button[disabled] { opacity: 0.6; cursor: progress; }
 
 .btn-small.mark-posted { background: #1f6b30; }
 .btn-small.mark-posted:hover { background: #154a20; }
+.btn-small.copy-comment { background: #0a66c2; font-weight: 600; }
+.btn-small.copy-comment:hover { background: #004182; }
+
+/* "Copy & comment" undo: stays in view while you're away on LinkedIn. */
+.undo-banner-sticky {
+    position: sticky; top: 0.5rem; z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.undo-banner .undo-close {
+    margin-left: auto; background: transparent; color: var(--primary);
+}
+.undo-banner .undo-close:hover { background: #cfe0f4; }
+.detail-actions { display: flex; justify-content: flex-end; }
 
 .comment-block.is-posted {
     border-color: var(--primary);

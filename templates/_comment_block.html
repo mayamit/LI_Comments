@@ -27,6 +27,10 @@
                 class="btn-small edit">Edit</button>
         <button onclick="liCopy(this, this.closest('.comment-block').querySelector('.comment-text'), {{ post_id }})"
                 class="btn-small copy">Copy</button>
+        {% with pid=post_id, tone_key=tone.key, url=post.url, base=post.base,
+                is_posted=(post.posted_tone == tone.key), post_is_posted=post.is_posted_status %}
+        {% include "_comment_post_actions.html" %}
+        {% endwith %}
         {% if can_regenerate %}
         <button hx-post="/dashboard/posts/{{ post_id }}/comments/{{ tone.key }}/regenerate"
                 hx-target="#comment-{{ post_id }}-{{ tone.key }}" hx-swap="outerHTML"

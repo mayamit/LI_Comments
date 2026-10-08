@@ -1,0 +1,32 @@
+{# Vars: undo_log_id, undo_base ("/dashboard" | "/discover"), undo_detail, active_status (dashboard only).
+   With undo_detail ("Copy & comment") the banner stays until undone or closed,
+   since you're away on LinkedIn; otherwise it counts down 10s as before. #}
+<div class="undo-banner {% if undo_detail %}undo-banner-sticky{% endif %}" id="undo-banner-{{ undo_log_id }}">
+    {% if undo_detail %}{{ undo_detail }}{% else %}Posted ✓{% endif %}
+    <button hx-post="{{ undo_base }}/posted/{{ undo_log_id }}/undo"
+            hx-target="#dashboard-main" hx-swap="outerHTML"
+            {% if active_status is defined and undo_base == "/dashboard" %}hx-vals='{"status": "{{ active_status }}"}'{% endif %}
+            class="btn-small">Undo</button>
+    {% if undo_detail %}
+    <button type="button" class="btn-small undo-close" aria-label="Close"
+            onclick="this.closest('.undo-banner').remove()">✕</button>
+    {% else %}
+    <span id="undo-timer-{{ undo_log_id }}">10s</span>
+    <script>
+    (function() {
+        const banner = document.getElementById("undo-banner-{{ undo_log_id }}");
+        const timer = document.getElementById("undo-timer-{{ undo_log_id }}");
+        let remaining = 10;
+        const intv = setInterval(() => {
+            remaining -= 1;
+            if (remaining <= 0) {
+                if (banner) banner.style.display = "none";
+                clearInterval(intv);
+            } else if (timer) {
+                timer.textContent = remaining + "s";
+            }
+        }, 1000);
+    })();
+    </script>
+    {% endif %}
+</div>

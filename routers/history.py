@@ -2,11 +2,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
 import tones as tones_store
-from database import get_db
+from database import get_db, unmark_posted
 from utils import relative_time, truncate
 
 router = APIRouter(prefix="/history", tags=["history"])
@@ -195,3 +195,11 @@ async def history_page(
             "filter_to": date_to or "",
         },
     )
+
+
+@router.post("/{log_id}/unmark")
+async def unmark(log_id: int):
+    """Take an entry out of history (any age) and send its post back to the
+    dashboard as reviewed. The page reloads so the stats recompute."""
+    await unmark_posted(log_id)
+    return Response(status_code=204, headers={"HX-Refresh": "true"})

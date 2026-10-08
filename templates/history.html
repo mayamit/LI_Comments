@@ -116,6 +116,12 @@
                 <h4>Comment you posted</h4>
                 <p class="comment-text">{{ r.comment_content or '(comment no longer in database)' }}</p>
             </div>
+            <div class="detail-actions">
+                <button hx-post="/history/{{ r.log_id }}/unmark"
+                        hx-confirm="Unmark this as posted? It's removed from history and stats, and the post goes back to the dashboard as Reviewed."
+                        class="btn-small btn-danger"
+                        title="Use this if it was marked posted by mistake">Unmark posted</button>
+            </div>
         </div>
     </details>
     {% endfor %}

@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+from typing import Optional
 
 import aiosqlite
 
@@ -319,3 +320,28 @@ async def get_db():
         yield db
     finally:
         await db.close()
+
+
+async def unmark_posted(log_id: int, max_age_s: Optional[int] = None) -> Optional[str]:
+    """Remove a posted_log entry and return its post to 'reviewed'.
+
+    With max_age_s, entries older than that are refused (the undo window).
+    Returns an error message, or None on success.
+    """
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT post_id, posted_at >= datetime('now', ?) AS fresh "
+            "FROM posted_log WHERE id = ?",
+            (f"-{max_age_s or 0} seconds", log_id),
+        )
+        row = await cur.fetchone()
+        if not row:
+            return "Already undone or removed."
+        if max_age_s is not None and not row["fresh"]:
+            return f"Undo window expired ({max_age_s // 60} minutes)."
+        await db.execute("DELETE FROM posted_log WHERE id = ?", (log_id,))
+        await db.execute(
+            "UPDATE posts SET status = 'reviewed' WHERE id = ?", (row["post_id"],)
+        )
+        await db.commit()
+    return None
